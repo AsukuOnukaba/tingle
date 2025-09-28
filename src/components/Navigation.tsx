@@ -7,7 +7,7 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
-    { path: "/", icon: Heart, label: "Explore" },
+    { path: "/explore", icon: Heart, label: "Explore" },
     { path: "/profile/1", icon: User, label: "Profile" },
     { path: "/chat", icon: MessageCircle, label: "Chat" },
     { path: "/creator", icon: Sparkles, label: "Creator" },
@@ -18,7 +18,7 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 group">
+          <Link to="/home" className="flex items-center space-x-2 group">
             <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center animate-pulse-neon">
               <Heart className="w-4 h-4 text-white" />
             </div>

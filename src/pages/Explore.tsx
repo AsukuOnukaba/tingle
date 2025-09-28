@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ProfileCard from "@/components/ProfileCard";
 import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
 // Import profile images
 import profile1 from "@/assets/profiles/profile-1.jpg";
@@ -13,6 +14,12 @@ import profile3 from "@/assets/profiles/profile-3.jpg";
 import profile4 from "@/assets/profiles/profile-4.jpg";
 import profile5 from "@/assets/profiles/profile-5.jpg";
 import profile6 from "@/assets/profiles/profile-6.jpg";
+import profile7 from "@/assets/profiles/profile-7.jpg";
+import profile8 from "@/assets/profiles/profile-8.jpg";
+import profile9 from "@/assets/profiles/profile-9.jpg";
+import profile10 from "@/assets/profiles/profile-10.jpg";
+import profile11 from "@/assets/profiles/profile-11.jpg";
+import profile12 from "@/assets/profiles/profile-12.jpg";
 
 const fakeProfiles = [
   {
@@ -79,6 +86,72 @@ const fakeProfiles = [
     isLocked: true,
     rating: 4.5,
     price: "$18.99",
+    isOnline: true,
+  },
+  {
+    id: 7,
+    name: "Luna",
+    age: 24,
+    location: "Portland, OR",
+    image: profile7,
+    isLocked: true,
+    rating: 4.8,
+    price: "$27.99",
+    isOnline: true,
+  },
+  {
+    id: 8,
+    name: "Alex",
+    age: 26,
+    location: "Denver, CO",
+    image: profile8,
+    isLocked: true,
+    rating: 4.7,
+    price: "$21.99",
+    isOnline: false,
+  },
+  {
+    id: 9,
+    name: "Maya",
+    age: 23,
+    location: "San Francisco, CA",
+    image: profile9,
+    isLocked: true,
+    rating: 4.9,
+    price: "$32.99",
+    isOnline: true,
+  },
+  {
+    id: 10,
+    name: "Tyler",
+    age: 28,
+    location: "Atlanta, GA",
+    image: profile10,
+    isLocked: true,
+    rating: 4.6,
+    price: "$20.99",
+    isOnline: true,
+  },
+  {
+    id: 11,
+    name: "Ruby",
+    age: 25,
+    location: "Nashville, TN",
+    image: profile11,
+    isLocked: true,
+    rating: 4.8,
+    price: "$26.99",
+    isOnline: false,
+  },
+  {
+    id: 12,
+    name: "Devon",
+    age: 27,
+    location: "Boston, MA",
+    image: profile12,
+    isLocked: true,
+    rating: 4.7,
+    price: "$23.99",
     isOnline: true,
   },
 ];
@@ -215,6 +288,8 @@ const Explore = () => {
           )}
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 };

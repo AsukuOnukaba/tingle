@@ -19,7 +19,7 @@ const Login = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate login/signup
-    navigate("/");
+    navigate("/explore");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
