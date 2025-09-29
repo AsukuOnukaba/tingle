@@ -253,12 +253,15 @@ const Explore = () => {
           </div>
 
           {/* Profile Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-up" style={{ animationDelay: "0.6s" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProfiles.map((profile, index) => (
               <div
                 key={profile.id}
-                className="animate-scale-in"
-                style={{ animationDelay: `${0.8 + index * 0.1}s` }}
+                className="animate-fade-in opacity-0"
+                style={{ 
+                  animationDelay: `${index * 0.1}s`,
+                  animationFillMode: 'forwards'
+                }}
               >
                 <ProfileCard {...profile} />
               </div>

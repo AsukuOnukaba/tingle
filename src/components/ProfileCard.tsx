@@ -28,6 +28,7 @@ const ProfileCard = ({
   isOnline = Math.random() > 0.5 
 }: ProfileCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   return (
     <div className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
@@ -51,19 +52,20 @@ const ProfileCard = ({
           </div>
         )}
 
-        {/* Lock Icon */}
-        {isLocked && (
-          <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm p-2 rounded-full">
-            <Lock className="w-4 h-4 text-white" />
-          </div>
-        )}
-
-        {/* Rating */}
-        <div className="absolute top-3 right-3">
+        {/* Status Icons - Top Right */}
+        <div className="absolute top-3 right-3 flex flex-col space-y-2">
+          {/* Rating */}
           <Badge variant="secondary" className="bg-black/50 backdrop-blur-sm text-white border-none">
             <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
             {rating}
           </Badge>
+          
+          {/* Lock Icon */}
+          {isLocked && (
+            <div className="bg-black/50 backdrop-blur-sm p-2 rounded-full self-end">
+              <Lock className="w-4 h-4 text-white" />
+            </div>
+          )}
         </div>
 
         {/* Like Button */}
@@ -110,9 +112,14 @@ const ProfileCard = ({
           </Button>
           <Button
             size="sm"
-            className="flex-1 gradient-primary hover:opacity-90 transition-smooth neon-glow"
+            onClick={() => setIsSubscribed(!isSubscribed)}
+            className={`flex-1 transition-smooth ${
+              isSubscribed 
+                ? "bg-green-600 hover:bg-green-700 text-white" 
+                : "gradient-primary hover:opacity-90 neon-glow"
+            }`}
           >
-            Subscribe
+            {isSubscribed ? "Subscribed" : "Subscribe"}
           </Button>
         </div>
       </div>
