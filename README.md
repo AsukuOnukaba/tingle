@@ -1,73 +1,72 @@
-# Welcome to your Lovable project
+# Tingle – Dating and Creator Subscription Platform
 
-## Project info
+Tingle is a hybrid social platform that combines dating interactions with creator-based subscriptions. Users can discover profiles, chat, and unlock premium content directly from creators. The experience is designed to merge the familiar flow of dating apps with the monetization features found in creator platforms.
 
-**URL**: https://lovable.dev/projects/141bb5f0-aa95-4c21-9070-60e283da71ac
+---
 
-## How can I edit this code?
+## Key Features
 
-There are several ways of editing your application.
+- Dark-mode interface with neon highlights  
+- Login and signup flow (front-end simulation)  
+- Explore page with creator profile cards  
+- Individual profile pages with bio, preview content, and action buttons (Subscribe, Message, Tip)  
+- Simulated chat interface to demonstrate conversation flow  
+- Creator application form with age and identity validation
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/141bb5f0-aa95-4c21-9070-60e283da71ac) and start prompting.
+## Creator Application Requirements
 
-Changes made via Lovable will be committed automatically to this repo.
+To discourage minors and ensure responsible onboarding, the application form includes:
 
-**Use your preferred IDE**
+- Full Legal Name  
+- Display Name / Stage Name  
+- Date of Birth (18+ validation)  
+- Email Address  
+- Gender  
+- City / Country  
+- Profile Photo Upload  
+- Government ID Upload (placeholder for review)  
+- Short Bio / Introduction  
+- Content Category or Niche (e.g. Flirty Chat, Fitness, Adult Content)  
+- Subscription Pricing
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+A mandatory confirmation statement must be displayed:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+> “By submitting this application, I confirm that I am 18 or older and legally permitted to share suggestive or adult content. I understand that all applications are subject to review before approval.”
 
-Follow these steps:
+---
+
+## Legal Disclaimer
+
+Tingle is strictly intended for users aged 18 and over. Any content involving minors is prohibited. All creator applications must undergo verification before approval. This version of the platform is provided for demonstration and development purposes only and is not operating as a live commercial service.
+
+---
+
+## Technology Stack
+
+| Layer        | Technology                     |
+|--------------|---------------------------------|
+| Framework    | React (with TypeScript)         |
+| Build Tool   | Vite                            |
+| Styling      | TailwindCSS or custom styling   |
+| Routing      | Client-side navigation          |
+| Assets       | Local or placeholder images     |
+
+---
+
+## Installation & Setup
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone <your-repo-url>
+cd tingle
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Run the development server
 npm run dev
-```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/141bb5f0-aa95-4c21-9070-60e283da71ac) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# Build for production
+npm run build
