@@ -41,7 +41,7 @@ const Home = () => {
                 size="lg"
                 className="gradient-primary hover:opacity-90 transition-smooth neon-glow text-lg px-8 py-6"
               >
-                <Link to="/">
+                <Link to="/explore">
                   Explore Creators
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Link>

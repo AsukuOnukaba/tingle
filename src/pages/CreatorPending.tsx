@@ -34,7 +34,7 @@ const CreatorPending = () => {
             </h1>
             
             <p className="text-lg text-muted-foreground mb-12">
-              Thank you for applying to become a creator on Tingle. We're excited to review your application!
+              Thank you! Your application has been submitted and is currently under review. You will be notified by email once approved.
             </p>
           </div>
 
@@ -116,7 +116,7 @@ const CreatorPending = () => {
                 asChild
                 className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
               >
-                <Link to="/">
+                <Link to="/explore">
                   <Heart className="w-4 h-4 mr-2" />
                   Explore Creators
                 </Link>
