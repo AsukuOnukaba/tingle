@@ -116,7 +116,7 @@ const Footer = () => {
         {/* Bottom Section */}
         <div className="border-t border-border/50 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <div className="text-sm text-muted-foreground mb-4 md:mb-0">
-            © 2024 Tingle. All rights reserved. Made with <Heart className="inline w-4 h-4 text-primary mx-1" /> for creators.
+            © {new Date().getFullYear()} Tingle. All rights reserved. Made with <Heart className="inline w-4 h-4 text-primary mx-1" /> for creators.
           </div>
           <div className="text-sm text-muted-foreground">
             18+ Adult Content Platform
