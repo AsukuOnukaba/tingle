@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Lock, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 
 interface ProfileCardProps {
-  id: number;
+  id: string;
   name: string;
   age: number;
   location: string;
@@ -27,8 +30,151 @@ const ProfileCard = ({
   price = "$19.99",
   isOnline = Math.random() > 0.5 
 }: ProfileCardProps) => {
+  const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const checkLikeAndSubscription = async () => {
+      // Check if user has liked this profile
+      const { data: likeData } = await supabase
+        .from('likes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('profile_id', id)
+        .maybeSingle();
+
+      setIsLiked(!!likeData);
+
+      // Check if user is subscribed to this profile
+      const { data: subData } = await supabase
+        .from('subscriptions')
+        .select('id')
+        .eq('subscriber_id', user.id)
+        .eq('creator_id', id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      setIsSubscribed(!!subData);
+    };
+
+    checkLikeAndSubscription();
+  }, [user, id]);
+
+  const handleLike = async () => {
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please login to like profiles.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (isLiked) {
+        await supabase
+          .from('likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('profile_id', id);
+        setIsLiked(false);
+      } else {
+        const { error } = await supabase
+          .from('likes')
+          .insert([{ user_id: user.id, profile_id: id }]);
+        if (error) throw error;
+        setIsLiked(true);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update like status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubscribe = async () => {
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please login to subscribe.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isSubscribed) {
+        await supabase
+          .from('subscriptions')
+          .delete()
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', id);
+        
+        setIsSubscribed(false);
+        toast({
+          title: "Unsubscribed",
+          description: "You've unsubscribed from this creator.",
+        });
+      } else {
+        // Check wallet balance
+        const { data: wallet } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .single();
+
+        const numericPrice = typeof price === 'string' 
+          ? parseFloat(price.replace('$', '')) 
+          : price;
+
+        if (!wallet || wallet.balance < numericPrice) {
+          toast({
+            title: "Insufficient funds",
+            description: "Please add credits to your wallet.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Deduct from wallet
+        await supabase
+          .from('wallets')
+          .update({ balance: wallet.balance - numericPrice })
+          .eq('user_id', user.id);
+
+        // Create subscription
+        const { error: subError } = await supabase
+          .from('subscriptions')
+          .insert([{ 
+            subscriber_id: user.id, 
+            creator_id: id,
+            is_active: true
+          }]);
+        if (subError) throw subError;
+
+        setIsSubscribed(true);
+        toast({
+          title: "Subscribed!",
+          description: `You're now subscribed to ${name}.`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update subscription.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
@@ -70,7 +216,7 @@ const ProfileCard = ({
 
         {/* Like Button */}
         <button
-          onClick={() => setIsLiked(!isLiked)}
+          onClick={handleLike}
           className={`absolute bottom-3 right-3 p-2 rounded-full transition-smooth hover-scale ${
             isLiked
               ? "bg-primary text-white animate-pulse-neon"
@@ -112,14 +258,15 @@ const ProfileCard = ({
           </Button>
           <Button
             size="sm"
-            onClick={() => setIsSubscribed(!isSubscribed)}
+            onClick={handleSubscribe}
+            disabled={loading}
             className={`flex-1 transition-smooth ${
               isSubscribed 
                 ? "bg-green-600 hover:bg-green-700 text-white" 
                 : "gradient-primary hover:opacity-90 neon-glow"
             }`}
           >
-            {isSubscribed ? "Subscribed" : "Subscribe"}
+            {loading ? "..." : (isSubscribed ? "Subscribed" : "Subscribe")}
           </Button>
         </div>
       </div>

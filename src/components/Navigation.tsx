@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Heart, User, MessageCircle, Settings, Sparkles } from "lucide-react";
+import { Heart, User, MessageCircle, Settings, Sparkles, LogIn, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { WalletDisplay } from "./WalletDisplay";
 
 const Navigation = () => {
   const location = useLocation();
+  const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
@@ -47,6 +51,28 @@ const Navigation = () => {
                 </Link>
               );
             })}
+          </div>
+
+          {/* Wallet & Auth */}
+          <div className="hidden md:flex items-center gap-3">
+            {user && <WalletDisplay />}
+            {user ? (
+              <Button 
+                variant="ghost" 
+                className="text-foreground hover:text-primary"
+                onClick={signOut}
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="ml-1">Logout</span>
+              </Button>
+            ) : (
+              <Button asChild variant="ghost" className="text-foreground hover:text-primary">
+                <Link to="/login" className="flex items-center space-x-1">
+                  <LogIn className="w-5 h-5" />
+                  <span>Login</span>
+                </Link>
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}

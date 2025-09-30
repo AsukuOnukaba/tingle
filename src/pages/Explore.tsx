@@ -23,7 +23,7 @@ import profile12 from "@/assets/profiles/profile-12.jpg";
 
 const fakeProfiles = [
   {
-    id: 1,
+    id: "1",
     name: "Emmanuel",
     age: 25,
     location: "New York, NY",
@@ -34,7 +34,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 2,
+    id: "2",
     name: "Jane",
     age: 28,
     location: "Los Angeles, CA",
@@ -45,7 +45,7 @@ const fakeProfiles = [
     isOnline: false,
   },
   {
-    id: 3,
+    id: "3",
     name: "Sophia",
     age: 24,
     location: "Miami, FL",
@@ -56,7 +56,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 4,
+    id: "4",
     name: "Marcus",
     age: 26,
     location: "Chicago, IL",
@@ -67,7 +67,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 5,
+    id: "5",
     name: "Zara",
     age: 27,
     location: "Austin, TX",
@@ -78,7 +78,7 @@ const fakeProfiles = [
     isOnline: false,
   },
   {
-    id: 6,
+    id: "6",
     name: "Ryan",
     age: 29,
     location: "Seattle, WA",
@@ -89,7 +89,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 7,
+    id: "7",
     name: "Lucky",
     age: 24,
     location: "Portland, OR",
@@ -100,7 +100,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 8,
+    id: "8",
     name: "Alex",
     age: 26,
     location: "Denver, CO",
@@ -111,7 +111,7 @@ const fakeProfiles = [
     isOnline: false,
   },
   {
-    id: 9,
+    id: "9",
     name: "Maya",
     age: 23,
     location: "San Francisco, CA",
@@ -122,7 +122,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 10,
+    id: "10",
     name: "Tyler",
     age: 28,
     location: "Atlanta, GA",
@@ -133,7 +133,7 @@ const fakeProfiles = [
     isOnline: true,
   },
   {
-    id: 11,
+    id: "11",
     name: "Ruby",
     age: 25,
     location: "Nashville, TN",
@@ -144,7 +144,7 @@ const fakeProfiles = [
     isOnline: false,
   },
   {
-    id: 12,
+    id: "12",
     name: "Devon",
     age: 27,
     location: "Boston, MA",
