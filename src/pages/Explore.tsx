@@ -24,7 +24,7 @@ import profile12 from "@/assets/profiles/profile-12.jpg";
 const fakeProfiles = [
   {
     id: 1,
-    name: "Emma",
+    name: "Emmanuel",
     age: 25,
     location: "New York, NY",
     image: profile1,
@@ -35,7 +35,7 @@ const fakeProfiles = [
   },
   {
     id: 2,
-    name: "Jake",
+    name: "Jane",
     age: 28,
     location: "Los Angeles, CA",
     image: profile2,
@@ -90,7 +90,7 @@ const fakeProfiles = [
   },
   {
     id: 7,
-    name: "Luna",
+    name: "Lucky",
     age: 24,
     location: "Portland, OR",
     image: profile7,
