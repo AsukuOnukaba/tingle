@@ -14,7 +14,136 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          profile_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          profile_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          profile_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "likes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          age: number
+          bio: string | null
+          created_at: string | null
+          display_name: string
+          id: string
+          is_online: boolean | null
+          location: string | null
+          price: number | null
+          profile_image: string | null
+          rating: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          age: number
+          bio?: string | null
+          created_at?: string | null
+          display_name: string
+          id: string
+          is_online?: boolean | null
+          location?: string | null
+          price?: number | null
+          profile_image?: string | null
+          rating?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          age?: number
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          is_online?: boolean | null
+          location?: string | null
+          price?: number | null
+          profile_image?: string | null
+          rating?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          subscriber_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          subscriber_id: string
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          subscriber_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          balance: number | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance?: number | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance?: number | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
