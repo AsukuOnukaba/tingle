@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Heart, User, MessageCircle, Settings, Sparkles, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,12 +7,13 @@ import { WalletDisplay } from "./WalletDisplay";
 
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
     { path: "/explore", icon: Heart, label: "Explore" },
-    { path: "/profile/1", icon: User, label: "Profile" },
+    { path: "/my-profile", icon: User, label: "Profile" },
     { path: "/chat", icon: MessageCircle, label: "Chat" },
     { path: "/creator", icon: Sparkles, label: "Creator" },
   ];
@@ -55,7 +56,11 @@ const Navigation = () => {
 
           {/* Wallet & Auth */}
           <div className="hidden md:flex items-center gap-3">
-            {user && <WalletDisplay />}
+            {user && (
+              <button onClick={() => navigate("/wallet")}>
+                <WalletDisplay />
+              </button>
+            )}
             {user ? (
               <Button 
                 variant="ghost" 

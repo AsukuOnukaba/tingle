@@ -182,10 +182,10 @@ const Explore = () => {
           {/* Header */}
           <div className="text-center mb-8 animate-fade-up">
             <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Discover Amazing People
+              Discover Creators & Connect
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Connect with creators, build relationships, and unlock exclusive content from people you love.
+              Private, premium experiences with adult creators. Subscribe for exclusive content, chat, and intimate connections.
             </p>
           </div>
 

@@ -9,6 +9,8 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Explore from "./pages/Explore";
 import Profile from "./pages/Profile";
+import MyProfile from "./pages/MyProfile";
+import Wallet from "./pages/Wallet";
 import Chat from "./pages/Chat";
 import Creator from "./pages/Creator";
 import CreatorPending from "./pages/CreatorPending";
@@ -35,6 +37,8 @@ const App = () => (
           <Route path="/explore" element={<Explore />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile/:id" element={<Profile />} />
+          <Route path="/my-profile" element={<MyProfile />} />
+          <Route path="/wallet" element={<Wallet />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/creator" element={<Creator />} />
           <Route path="/creator/pending" element={<CreatorPending />} />
