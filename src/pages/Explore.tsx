@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Search, Filter, SlidersHorizontal } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,19 +7,8 @@ import ProfileCard from "@/components/ProfileCard";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 
-// Import profile images
-import profile1 from "@/assets/profiles/profile-1.jpg";
-import profile2 from "@/assets/profiles/profile-2.jpg";
-import profile3 from "@/assets/profiles/profile-3.jpg";
-import profile4 from "@/assets/profiles/profile-4.jpg";
-import profile5 from "@/assets/profiles/profile-5.jpg";
-import profile6 from "@/assets/profiles/profile-6.jpg";
-import profile7 from "@/assets/profiles/profile-7.jpg";
-import profile8 from "@/assets/profiles/profile-8.jpg";
-import profile9 from "@/assets/profiles/profile-9.jpg";
-import profile10 from "@/assets/profiles/profile-10.jpg";
-import profile11 from "@/assets/profiles/profile-11.jpg";
-import profile12 from "@/assets/profiles/profile-12.jpg";
+// Lazy load profile images
+const getProfileImage = (num: number) => `/src/assets/profiles/profile-${num}.jpg`;
 
 const fakeProfiles = [
   {
@@ -27,7 +16,7 @@ const fakeProfiles = [
     name: "Emmanuel",
     age: 25,
     location: "New York, NY",
-    image: profile1,
+    image: getProfileImage(1),
     isLocked: true,
     rating: 4.9,
     price: "$24.99",
@@ -38,7 +27,7 @@ const fakeProfiles = [
     name: "Jane",
     age: 28,
     location: "Los Angeles, CA",
-    image: profile2,
+    image: getProfileImage(2),
     isLocked: true,
     rating: 4.7,
     price: "$19.99",
@@ -49,7 +38,7 @@ const fakeProfiles = [
     name: "Sophia",
     age: 24,
     location: "Miami, FL",
-    image: profile3,
+    image: getProfileImage(3),
     isLocked: true,
     rating: 4.8,
     price: "$29.99",
@@ -60,7 +49,7 @@ const fakeProfiles = [
     name: "Marcus",
     age: 26,
     location: "Chicago, IL",
-    image: profile4,
+    image: getProfileImage(4),
     isLocked: true,
     rating: 4.6,
     price: "$22.99",
@@ -71,7 +60,7 @@ const fakeProfiles = [
     name: "Zara",
     age: 27,
     location: "Austin, TX",
-    image: profile5,
+    image: getProfileImage(5),
     isLocked: true,
     rating: 4.9,
     price: "$34.99",
@@ -82,7 +71,7 @@ const fakeProfiles = [
     name: "Ryan",
     age: 29,
     location: "Seattle, WA",
-    image: profile6,
+    image: getProfileImage(6),
     isLocked: true,
     rating: 4.5,
     price: "$18.99",
@@ -93,7 +82,7 @@ const fakeProfiles = [
     name: "Lucky",
     age: 24,
     location: "Portland, OR",
-    image: profile7,
+    image: getProfileImage(7),
     isLocked: true,
     rating: 4.8,
     price: "$27.99",
@@ -104,7 +93,7 @@ const fakeProfiles = [
     name: "Alex",
     age: 26,
     location: "Denver, CO",
-    image: profile8,
+    image: getProfileImage(8),
     isLocked: true,
     rating: 4.7,
     price: "$21.99",
@@ -115,7 +104,7 @@ const fakeProfiles = [
     name: "Maya",
     age: 23,
     location: "San Francisco, CA",
-    image: profile9,
+    image: getProfileImage(9),
     isLocked: true,
     rating: 4.9,
     price: "$32.99",
@@ -126,7 +115,7 @@ const fakeProfiles = [
     name: "Tyler",
     age: 28,
     location: "Atlanta, GA",
-    image: profile10,
+    image: getProfileImage(10),
     isLocked: true,
     rating: 4.6,
     price: "$20.99",
@@ -137,7 +126,7 @@ const fakeProfiles = [
     name: "Ruby",
     age: 25,
     location: "Nashville, TN",
-    image: profile11,
+    image: getProfileImage(11),
     isLocked: true,
     rating: 4.8,
     price: "$26.99",
@@ -148,7 +137,7 @@ const fakeProfiles = [
     name: "Devon",
     age: 27,
     location: "Boston, MA",
-    image: profile12,
+    image: getProfileImage(12),
     isLocked: true,
     rating: 4.7,
     price: "$23.99",
@@ -162,16 +151,19 @@ const Explore = () => {
 
   const filters = ["All", "Online", "New", "Premium", "Local"];
 
-  const filteredProfiles = fakeProfiles.filter(profile => {
-    const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         profile.location.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = selectedFilter === "All" || 
-                         (selectedFilter === "Online" && profile.isOnline) ||
-                         (selectedFilter === "Premium" && parseFloat(profile.price.replace("$", "")) > 25);
-    
-    return matchesSearch && matchesFilter;
-  });
+  // Memoize filtered profiles to prevent unnecessary recalculations
+  const filteredProfiles = useMemo(() => {
+    return fakeProfiles.filter(profile => {
+      const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           profile.location.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesFilter = selectedFilter === "All" || 
+                           (selectedFilter === "Online" && profile.isOnline) ||
+                           (selectedFilter === "Premium" && parseFloat(profile.price.replace("$", "")) > 25);
+      
+      return matchesSearch && matchesFilter;
+    });
+  }, [searchTerm, selectedFilter]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -254,17 +246,8 @@ const Explore = () => {
 
           {/* Profile Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProfiles.map((profile, index) => (
-              <div
-                key={profile.id}
-                className="animate-fade-in opacity-0"
-                style={{ 
-                  animationDelay: `${index * 0.1}s`,
-                  animationFillMode: 'forwards'
-                }}
-              >
-                <ProfileCard {...profile} />
-              </div>
+            {filteredProfiles.map((profile) => (
+              <ProfileCard key={profile.id} {...profile} />
             ))}
           </div>
 

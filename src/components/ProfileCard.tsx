@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Lock, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -34,35 +35,56 @@ const ProfileCard = ({
   const [isLiked, setIsLiked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
+  // Intersection Observer for lazy loading
   useEffect(() => {
-    if (!user) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '50px' }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Only fetch data when card is visible
+  useEffect(() => {
+    if (!user || !isVisible) return;
 
     const checkLikeAndSubscription = async () => {
-      // Check if user has liked this profile
-      const { data: likeData } = await supabase
-        .from('likes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('profile_id', id)
-        .maybeSingle();
+      const [likeData, subData] = await Promise.all([
+        supabase
+          .from('likes')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('profile_id', id)
+          .maybeSingle(),
+        supabase
+          .from('subscriptions')
+          .select('id')
+          .eq('subscriber_id', user.id)
+          .eq('creator_id', id)
+          .eq('is_active', true)
+          .maybeSingle()
+      ]);
 
-      setIsLiked(!!likeData);
-
-      // Check if user is subscribed to this profile
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('subscriber_id', user.id)
-        .eq('creator_id', id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      setIsSubscribed(!!subData);
+      setIsLiked(!!likeData.data);
+      setIsSubscribed(!!subData.data);
     };
 
     checkLikeAndSubscription();
-  }, [user, id]);
+  }, [user, id, isVisible]);
 
   const handleLike = async () => {
     if (!user) {
@@ -177,15 +199,18 @@ const ProfileCard = ({
   };
 
   return (
-    <div className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
+    <div ref={cardRef} className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
       {/* Profile Image */}
-      <div className="relative aspect-[3/4] overflow-hidden">
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
+        {!imageLoaded && <Skeleton className="absolute inset-0" />}
         <img
           src={image}
           alt={name}
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
           className={`w-full h-full object-cover transition-smooth ${
             isLocked ? "profile-blur group-hover:filter-none" : ""
-          }`}
+          } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
         />
         
         {/* Online Status */}
