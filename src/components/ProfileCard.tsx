@@ -206,7 +206,6 @@ const ProfileCard = ({
         <img
           src={image}
           alt={name}
-          loading="lazy"
           onLoad={() => setImageLoaded(true)}
           className={`w-full h-full object-cover transition-smooth ${
             isLocked ? "profile-blur group-hover:filter-none" : ""
