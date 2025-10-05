@@ -51,7 +51,7 @@ const Home = () => {
                 asChild
                 variant="outline"
                 size="lg"
-                className="bg-background/50 border-primary/30 hover:bg-primary/10 transition-smooth text-lg px-8 py-6"
+                className="bg-background/50 border-primary/30 hover:bg-primary/10 hover:text-white transition-smooth text-lg px-8 py-6"
               >
                 <Link to="/creator">
                   Become a Creator
