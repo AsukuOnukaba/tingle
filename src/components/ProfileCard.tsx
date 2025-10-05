@@ -286,11 +286,11 @@ const ProfileCard = ({
             disabled={loading}
             className={`flex-1 transition-smooth ${
               isSubscribed 
-                ? "bg-green-600 hover:bg-green-700 text-white" 
+                ? "bg-green-500 hover:bg-green-600 text-white border-green-500" 
                 : "gradient-primary hover:opacity-90 neon-glow"
             }`}
           >
-            {loading ? "..." : (isSubscribed ? "Subscribed" : "Subscribe")}
+            {loading ? "..." : (isSubscribed ? "✓ Subscribed" : "Subscribe")}
           </Button>
         </div>
       </div>
