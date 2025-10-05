@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useWeb3 } from "@/hooks/useWeb3";
 import { toast } from "@/hooks/use-toast";
 
 interface ProfileCardProps {
@@ -32,6 +33,7 @@ const ProfileCard = ({
   isOnline = Math.random() > 0.5 
 }: ProfileCardProps) => {
   const { user } = useAuth();
+  const { isConnected, subscribe: web3Subscribe, unsubscribe: web3Unsubscribe } = useWeb3();
   const [isLiked, setIsLiked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -130,9 +132,22 @@ const ProfileCard = ({
       return;
     }
 
+    if (!isConnected) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your Web3 wallet to subscribe.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       if (isSubscribed) {
+        // Unsubscribe via smart contract
+        await web3Unsubscribe(id);
+        
+        // Update Supabase record
         await supabase
           .from('subscriptions')
           .delete()
@@ -145,33 +160,10 @@ const ProfileCard = ({
           description: "You've unsubscribed from this creator.",
         });
       } else {
-        // Check wallet balance
-        const { data: wallet } = await supabase
-          .from('wallets')
-          .select('balance')
-          .eq('user_id', user.id)
-          .single();
+        // Subscribe via smart contract (payment handled on-chain)
+        await web3Subscribe(id, price);
 
-        const numericPrice = typeof price === 'string' 
-          ? parseFloat(price.replace('$', '')) 
-          : price;
-
-        if (!wallet || wallet.balance < numericPrice) {
-          toast({
-            title: "Insufficient funds",
-            description: "Please add credits to your wallet.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Deduct from wallet
-        await supabase
-          .from('wallets')
-          .update({ balance: wallet.balance - numericPrice })
-          .eq('user_id', user.id);
-
-        // Create subscription
+        // Record subscription in Supabase for off-chain tracking
         const { error: subError } = await supabase
           .from('subscriptions')
           .insert([{ 

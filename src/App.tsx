@@ -4,6 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { WagmiProvider } from 'wagmi';
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
+import { Web3Provider } from '@/hooks/useWeb3';
+import { web3Config } from '@/config/web3Config';
+import '@rainbow-me/rainbowkit/styles.css';
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -25,13 +30,16 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
+  <WagmiProvider config={web3Config}>
+    <QueryClientProvider client={queryClient}>
+      <RainbowKitProvider>
+        <Web3Provider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthProvider>
+                <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/home" element={<Home />} />
           <Route path="/explore" element={<Explore />} />
@@ -50,11 +58,14 @@ const App = () => (
           <Route path="/premium/:id/chat" element={<PremiumChat />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+                </Routes>
+              </AuthProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+        </Web3Provider>
+      </RainbowKitProvider>
+    </QueryClientProvider>
+  </WagmiProvider>
 );
 
 export default App;
