@@ -4,6 +4,7 @@ import { Heart, User, MessageCircle, Settings, Sparkles, LogIn, LogOut } from "l
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { WalletDisplay } from "./WalletDisplay";
+import { WalletConnectButton } from "./WalletConnectButton";
 
 const Navigation = () => {
   const location = useLocation();
@@ -56,6 +57,7 @@ const Navigation = () => {
 
           {/* Wallet & Auth */}
           <div className="hidden md:flex items-center gap-3">
+            <WalletConnectButton />
             {user && (
               <button onClick={() => navigate("/wallet")}>
                 <WalletDisplay />
@@ -97,6 +99,9 @@ const Navigation = () => {
         {isOpen && (
           <div className="md:hidden py-4 animate-fade-up">
             <div className="flex flex-col space-y-2">
+              <div className="px-4 pb-2">
+                <WalletConnectButton />
+              </div>
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
