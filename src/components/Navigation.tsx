@@ -1,22 +1,59 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Heart, User, MessageCircle, Settings, Sparkles, LogIn, LogOut } from "lucide-react";
+import { Heart, User, MessageCircle, Settings, Sparkles, LogIn, LogOut, Image, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { WalletDisplay } from "./WalletDisplay";
 import { WalletConnectButton } from "./WalletConnectButton";
+import { supabase } from "@/integrations/supabase/client";
 
 const Navigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      setIsCreator(false);
+      return;
+    }
+
+    const checkRoles = async () => {
+      // Check if admin
+      const { data: adminData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .single();
+
+      setIsAdmin(!!adminData);
+
+      // Check if approved creator
+      const { data: creatorData } = await supabase
+        .from('creators')
+        .select('status')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+        .single();
+
+      setIsCreator(!!creatorData);
+    };
+
+    checkRoles();
+  }, [user]);
 
   const navItems = [
     { path: "/explore", icon: Heart, label: "Explore" },
+    { path: "/media-gallery", icon: Image, label: "Gallery" },
     { path: "/my-profile", icon: User, label: "Profile" },
     { path: "/chat", icon: MessageCircle, label: "Chat" },
-    { path: "/creator", icon: Sparkles, label: "Creator" },
+    ...(isCreator ? [{ path: "/creator-dashboard", icon: Sparkles, label: "Creator" }] : []),
+    ...(isAdmin ? [{ path: "/admin", icon: Shield, label: "Admin" }] : []),
   ];
 
   return (

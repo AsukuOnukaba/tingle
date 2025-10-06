@@ -19,6 +19,10 @@ import Wallet from "./pages/Wallet";
 import Chat from "./pages/Chat";
 import Creator from "./pages/Creator";
 import CreatorPending from "./pages/CreatorPending";
+import CreatorApplication from "./pages/CreatorApplication";
+import CreatorDashboard from "./pages/CreatorDashboard";
+import MediaGallery from "./pages/MediaGallery";
+import AdminDashboard from "./pages/AdminDashboard";
 import About from "./pages/About";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -50,6 +54,10 @@ const App = () => (
           <Route path="/chat" element={<Chat />} />
           <Route path="/creator" element={<Creator />} />
           <Route path="/creator/pending" element={<CreatorPending />} />
+          <Route path="/creator-application" element={<CreatorApplication />} />
+          <Route path="/creator-dashboard" element={<CreatorDashboard />} />
+          <Route path="/media-gallery" element={<MediaGallery />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/about" element={<About />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
