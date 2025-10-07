@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import Navigation from "@/components/Navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +57,10 @@ const Wallet = () => {
   const [balance, setBalance] = useState(0);
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [bankCode, setBankCode] = useState("");
+  const [transactions, setTransactions] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -63,6 +68,7 @@ const Wallet = () => {
       return;
     }
     fetchBalance();
+    fetchTransactions();
 
     // Subscribe to wallet changes
     const channel = supabase
@@ -83,8 +89,26 @@ const Wallet = () => {
       )
       .subscribe();
 
+    // Subscribe to transaction changes
+    const txChannel = supabase
+      .channel('transaction-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          fetchTransactions();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(txChannel);
     };
   }, [user]);
 
@@ -102,6 +126,21 @@ const Wallet = () => {
     }
   };
 
+  const fetchTransactions = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (data) {
+      setTransactions(data);
+    }
+  };
+
   const handleAddFunds = async (method: string) => {
     if (!user || !amount) {
       toast({
@@ -112,27 +151,90 @@ const Wallet = () => {
       return;
     }
 
+    if (method !== "Paystack") {
+      toast({
+        title: "Coming Soon",
+        description: `${method} integration is not yet available. Please use Paystack.`,
+        variant: "default",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const numericAmount = parseFloat(amount);
       
-      // For demo purposes, directly add to wallet
-      const { error } = await supabase
-        .from("wallets")
-        .update({ balance: balance + numericAmount })
-        .eq("user_id", user.id);
+      const { data, error } = await supabase.functions.invoke('wallet-topup', {
+        body: {
+          amount: numericAmount,
+          email: user.email,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.authorization_url) {
+        // Redirect to Paystack payment page
+        window.location.href = data.authorization_url;
+      }
+    } catch (error) {
+      console.error('Top-up error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initialize payment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!user || !withdrawAmount || !accountNumber || !bankCode) {
+      toast({
+        title: "Invalid input",
+        description: "Please fill in all withdrawal details.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const numericAmount = parseFloat(withdrawAmount);
+      
+      if (numericAmount > balance) {
+        toast({
+          title: "Insufficient balance",
+          description: "You don't have enough funds to withdraw.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('wallet-withdraw', {
+        body: {
+          amount: numericAmount,
+          account_number: accountNumber,
+          bank_code: bankCode,
+        },
+      });
 
       if (error) throw error;
 
       toast({
-        title: "Funds added!",
-        description: `$${numericAmount.toFixed(2)} added to your wallet via ${method}.`,
+        title: "Withdrawal successful!",
+        description: `$${data.net_amount.toFixed(2)} will be sent to your account (Fee: $${data.fee.toFixed(2)}).`,
       });
-      setAmount("");
+      
+      setWithdrawAmount("");
+      setAccountNumber("");
+      setBankCode("");
     } catch (error) {
+      console.error('Withdrawal error:', error);
       toast({
         title: "Error",
-        description: "Failed to add funds.",
+        description: "Failed to process withdrawal. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -169,7 +271,14 @@ const Wallet = () => {
                 ${balance.toFixed(2)}
               </div>
               <div className="flex gap-4 justify-center">
-                <Button variant="outline" className="bg-muted/50 border-border/50 hover:bg-muted">
+                <Button 
+                  variant="outline" 
+                  className="bg-muted/50 border-border/50 hover:bg-muted"
+                  onClick={() => {
+                    const withdrawTab = document.querySelector('[value="withdraw"]');
+                    if (withdrawTab) (withdrawTab as HTMLElement).click();
+                  }}
+                >
                   <ArrowDownLeft className="w-4 h-4 mr-2" />
                   Withdraw
                 </Button>
@@ -179,14 +288,18 @@ const Wallet = () => {
 
           {/* Add Funds Section */}
           <Tabs defaultValue="add" className="animate-fade-up" style={{ animationDelay: "0.2s" }}>
-            <TabsList className="grid grid-cols-2 mb-8 bg-muted/50">
+            <TabsList className="grid grid-cols-3 mb-8 bg-muted/50">
               <TabsTrigger value="add" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Funds
               </TabsTrigger>
+              <TabsTrigger value="withdraw" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
+                <ArrowDownLeft className="w-4 h-4 mr-2" />
+                Withdraw
+              </TabsTrigger>
               <TabsTrigger value="history" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
                 <ArrowUpRight className="w-4 h-4 mr-2" />
-                Transaction History
+                History
               </TabsTrigger>
             </TabsList>
 
@@ -273,14 +386,114 @@ const Wallet = () => {
               </Card>
             </TabsContent>
 
+            <TabsContent value="withdraw">
+              <Card className="glass-card border-border/50">
+                <CardHeader>
+                  <CardTitle>Withdraw Funds</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <Label htmlFor="withdraw-amount">Amount</Label>
+                    <Input
+                      id="withdraw-amount"
+                      type="number"
+                      placeholder="0.00"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      className="bg-muted/50 border-border/50"
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Fee: 20% • You will receive: ${withdrawAmount ? (parseFloat(withdrawAmount) * 0.8).toFixed(2) : '0.00'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="account-number">Account Number</Label>
+                    <Input
+                      id="account-number"
+                      type="text"
+                      placeholder="0123456789"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="bg-muted/50 border-border/50"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="bank-code">Bank Code</Label>
+                    <Input
+                      id="bank-code"
+                      type="text"
+                      placeholder="e.g., 058 for GTBank"
+                      value={bankCode}
+                      onChange={(e) => setBankCode(e.target.value)}
+                      className="bg-muted/50 border-border/50"
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      <a 
+                        href="https://paystack.com/docs/payments/bank-codes" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        Find your bank code here
+                      </a>
+                    </p>
+                  </div>
+
+                  <Button 
+                    onClick={handleWithdraw} 
+                    disabled={loading}
+                    className="w-full gradient-primary"
+                  >
+                    {loading ? "Processing..." : "Withdraw Funds"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="history">
               <Card className="glass-card border-border/50">
-                <CardContent className="p-12 text-center">
-                  <ArrowUpRight className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No transactions yet</h3>
-                  <p className="text-muted-foreground">
-                    Your transaction history will appear here
-                  </p>
+                <CardContent className="p-6">
+                  {transactions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <ArrowUpRight className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No transactions yet</h3>
+                      <p className="text-muted-foreground">
+                        Your transaction history will appear here
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {transactions.map((tx) => (
+                        <div key={tx.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                          <div className="flex items-center gap-4">
+                            <div className={`p-2 rounded-full ${tx.type === 'deposit' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                              {tx.type === 'deposit' ? (
+                                <ArrowDownLeft className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <ArrowUpRight className="w-4 h-4 text-red-500" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-semibold capitalize">{tx.type}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {new Date(tx.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`font-bold ${tx.type === 'deposit' ? 'text-green-500' : 'text-red-500'}`}>
+                              {tx.type === 'deposit' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+                            </div>
+                            <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
+                              {tx.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
