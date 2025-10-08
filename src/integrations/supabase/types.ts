@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      creators: {
+        Row: {
+          application_note: string | null
+          bio: string | null
+          created_at: string | null
+          display_name: string
+          id: string
+          pending_balance: number | null
+          status: string
+          total_earned: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          application_note?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name: string
+          id?: string
+          pending_balance?: number | null
+          status?: string
+          total_earned?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          application_note?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          pending_balance?: number | null
+          status?: string
+          total_earned?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           created_at: string | null
@@ -39,6 +78,88 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          description: string | null
+          file_url: string
+          id: string
+          is_premium: boolean | null
+          price: number
+          status: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          description?: string | null
+          file_url: string
+          id?: string
+          is_premium?: boolean | null
+          price?: number
+          status?: string
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          description?: string | null
+          file_url?: string
+          id?: string
+          is_premium?: boolean | null
+          price?: number
+          status?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media_purchases: {
+        Row: {
+          buyer_id: string
+          created_at: string | null
+          id: string
+          media_id: string
+          price_paid: number
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string | null
+          id?: string
+          media_id: string
+          price_paid: number
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string | null
+          id?: string
+          media_id?: string
+          price_paid?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_purchases_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
             referencedColumns: ["id"]
           },
         ]
@@ -120,6 +241,69 @@ export type Database = {
           },
         ]
       }
+      transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          payment_provider: string | null
+          reference: string | null
+          status: string
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_provider?: string | null
+          reference?: string | null
+          status?: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_provider?: string | null
+          reference?: string | null
+          status?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           balance: number | null
@@ -149,10 +333,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "creator" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -279,6 +469,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "creator", "admin"],
+    },
   },
 } as const
