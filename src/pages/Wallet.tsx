@@ -177,11 +177,11 @@ const Wallet = () => {
         // Redirect to Paystack payment page
         window.location.href = data.authorization_url;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Top-up error:', error);
       toast({
         title: "Error",
-        description: "Failed to initialize payment. Please try again.",
+        description: error?.message || "Failed to initialize payment. Please try again.",
         variant: "destructive",
       });
     } finally {
