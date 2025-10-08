@@ -1,5 +1,5 @@
-import { createContext, useContext, ReactNode } from 'react';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useReadContract, useChainId } from 'wagmi';
+import { createContext, useContext, ReactNode, useMemo } from 'react';
+import { useAccount, useConnect, useDisconnect, useWriteContract, useChainId } from 'wagmi';
 import { parseEther } from 'viem';
 import { CONTRACT_ADDRESSES, SUBSCRIPTION_CONTRACT_ABI } from '@/config/web3Config';
 import { toast } from '@/hooks/use-toast';
@@ -8,26 +8,40 @@ interface Web3ContextType {
   address: string | undefined;
   isConnected: boolean;
   isConnecting: boolean;
-  connect: () => void;
+  connect: () => Promise<void>;
   disconnect: () => void;
   subscribe: (creatorAddress: string, price: string) => Promise<void>;
   unsubscribe: (creatorAddress: string) => Promise<void>;
   checkSubscription: (creatorAddress: string) => Promise<boolean>;
 }
 
-const Web3Context = createContext<Web3ContextType | undefined>(undefined);
+export const Web3Context = createContext<Web3ContextType | undefined>(undefined);
 
-export const Web3Provider = ({ children }: { children: ReactNode }) => {
+export function Web3Provider({ children }: { children: ReactNode }) {
   const { address, isConnected, chain } = useAccount();
   const chainId = useChainId();
   const { connect: wagmiConnect, connectors, isPending } = useConnect();
   const { disconnect: wagmiDisconnect } = useDisconnect();
   const { writeContractAsync } = useWriteContract();
 
-  const connect = () => {
+  const connect = async () => {
     const injectedConnector = connectors.find((c) => c.id === 'injected');
     if (injectedConnector) {
-      wagmiConnect({ connector: injectedConnector });
+      try {
+        // ensure we await the wagmi connect promise
+        await wagmiConnect({ connector: injectedConnector });
+      } catch (err) {
+        console.error('wagmiConnect error', err);
+        toast({
+          title: "Connection failed",
+          description: String(err ?? "Unknown error"),
+          variant: "destructive",
+        });
+        throw err;
+      }
+    } else {
+      console.warn('No injected connector found');
+      throw new Error('No injected connector found');
     }
   };
 
@@ -44,11 +58,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
       });
       return;
     }
-
     try {
-      // Get current chain ID from the connected wallet
       const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
-
       if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
         toast({
           title: "Contract not deployed",
@@ -57,10 +68,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
         });
         return;
       }
-
       const priceInEth = parseEther(price.replace('$', ''));
-      const duration = 30 * 24 * 60 * 60; // 30 days in seconds
-
+      const duration = 30 * 24 * 60 * 60;
       await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: SUBSCRIPTION_CONTRACT_ABI,
@@ -70,7 +79,6 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
         account: address as `0x${string}`,
         chain: chain,
       });
-
       toast({
         title: "Subscription successful!",
         description: "Your subscription has been processed on-chain.",
@@ -95,10 +103,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
       });
       return;
     }
-
     try {
       const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
-
       await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: SUBSCRIPTION_CONTRACT_ABI,
@@ -107,7 +113,6 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
         account: address as `0x${string}`,
         chain: chain,
       });
-
       toast({
         title: "Unsubscribed",
         description: "You've been unsubscribed successfully.",
@@ -125,12 +130,8 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
 
   const checkSubscription = async (creatorAddress: string): Promise<boolean> => {
     if (!address) return false;
-
     try {
       const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
-
-      // This would use useReadContract in actual implementation
-      // For now, return false as placeholder
       return false;
     } catch (error) {
       console.error('Check subscription error:', error);
@@ -138,28 +139,26 @@ export const Web3Provider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  return (
-    <Web3Context.Provider
-      value={{
-        address,
-        isConnected,
-        isConnecting: isPending,
-        connect,
-        disconnect,
-        subscribe,
-        unsubscribe,
-        checkSubscription,
-      }}
-    >
-      {children}
-    </Web3Context.Provider>
+  // stabilize provider value to avoid Fast Refresh incompatibilities
+  const value = useMemo(
+    () => ({
+      address,
+      isConnected,
+      isConnecting: isPending,
+      connect,
+      disconnect,
+      subscribe,
+      unsubscribe,
+      checkSubscription,
+    }),
+    [address, isConnected, isPending, connectors] // connectors included to re-create when connectors change
   );
-};
+
+  return <Web3Context.Provider value={value}>{children}</Web3Context.Provider>;
+}
 
 export const useWeb3 = () => {
   const context = useContext(Web3Context);
-  if (context === undefined) {
-    throw new Error('useWeb3 must be used within a Web3Provider');
-  }
+  if (!context) throw new Error('useWeb3 must be used within a Web3Provider');
   return context;
 };

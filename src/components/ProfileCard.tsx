@@ -8,13 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useWeb3 } from "@/hooks/useWeb3";
 import { toast } from "@/hooks/use-toast";
+import React from "react";
 
 interface ProfileCardProps {
   id: string;
   name: string;
-  age: number;
-  location: string;
-  image: string;
+  age?: number;
+  location?: string;
+  image?: string;
   isLocked?: boolean;
   rating?: number;
   price?: string;
@@ -27,10 +28,10 @@ const ProfileCard = ({
   age, 
   location, 
   image, 
-  isLocked = true, 
-  rating = 4.8,
-  price = "$19.99",
-  isOnline = Math.random() > 0.5 
+  isLocked, 
+  rating, 
+  price, 
+  isOnline 
 }: ProfileCardProps) => {
   const { user } = useAuth();
   const { isConnected, subscribe: web3Subscribe, unsubscribe: web3Unsubscribe } = useWeb3();
@@ -250,7 +251,7 @@ const ProfileCard = ({
       <div className="absolute inset-x-0 bottom-0 p-4 text-white">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-lg font-semibold">{name}, {age}</h3>
+            <h3 className="text-lg font-semibold">{name}{age ? `, ${age}` : ""}</h3>
             <div className="flex items-center text-sm text-gray-300">
               <MapPin className="w-3 h-3 mr-1" />
               {location}
@@ -290,4 +291,4 @@ const ProfileCard = ({
   );
 };
 
-export default ProfileCard;
+export default React.memo(ProfileCard);
