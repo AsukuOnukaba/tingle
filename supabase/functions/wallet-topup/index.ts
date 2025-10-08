@@ -11,6 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Use anon key for auth check
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -19,6 +20,12 @@ Deno.serve(async (req) => {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
+    );
+
+    // Use service role for database operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
@@ -66,8 +73,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create pending transaction record
-    const { error: txError } = await supabaseClient
+    // Create pending transaction record using service role
+    const { error: txError } = await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: user.id,

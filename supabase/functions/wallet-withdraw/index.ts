@@ -13,6 +13,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Use anon key for auth check
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -21,6 +22,12 @@ Deno.serve(async (req) => {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
+    );
+
+    // Use service role for database operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
@@ -48,7 +55,7 @@ Deno.serve(async (req) => {
     }
 
     // Get current wallet balance
-    const { data: wallet, error: walletError } = await supabaseClient
+    const { data: wallet, error: walletError } = await supabaseAdmin
       .from('wallets')
       .select('balance')
       .eq('user_id', user.id)
@@ -125,7 +132,7 @@ Deno.serve(async (req) => {
 
     // Deduct from wallet
     const newBalance = wallet.balance - amount;
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await supabaseAdmin
       .from('wallets')
       .update({ balance: newBalance })
       .eq('user_id', user.id);
@@ -139,7 +146,7 @@ Deno.serve(async (req) => {
     }
 
     // Create transaction records for both withdrawal and fee
-    const { error: txError } = await supabaseClient
+    const { error: txError } = await supabaseAdmin
       .from('transactions')
       .insert([
         {
