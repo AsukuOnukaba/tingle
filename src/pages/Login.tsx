@@ -1,85 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
   });
 
-  useEffect(() => {
-    if (user) {
-      navigate('/explore');
-    }
-  }, [user, navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
-        });
-        navigate("/explore");
-      } else {
-        if (formData.password !== formData.confirmPassword) {
-          toast({
-            title: "Error",
-            description: "Passwords do not match.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const { error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/explore`,
-          },
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Account created!",
-          description: "Welcome to Tingle. You're now logged in.",
-        });
-        navigate("/explore");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Simulate login/signup
+    navigate("/explore");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,51 +27,6 @@ const Login = () => {
       ...prev,
       [e.target.name]: e.target.value
     }));
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/explore`
-        }
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      toast({
-        title: "Google login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    if (!formData.email) {
-      toast({
-        title: "Email required",
-        description: "Please enter your email to reset password.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/explore`
-      });
-      if (error) throw error;
-      toast({
-        title: "Reset email sent",
-        description: "Check your email for password reset instructions.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Reset failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
   };
 
   return (
@@ -239,10 +134,9 @@ const Login = () => {
 
             <Button
               type="submit"
-              disabled={loading}
               className="w-full gradient-primary hover:opacity-90 transition-smooth neon-glow font-semibold py-6"
             >
-              {loading ? "Please wait..." : (isLogin ? "Sign In" : "Create Account")}
+              {isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>
 
@@ -257,9 +151,7 @@ const Login = () => {
             </div>
 
             <Button
-              type="button"
               variant="outline"
-              onClick={handleGoogleLogin}
               className="w-full mt-4 bg-muted/50 border-border/50 hover:bg-muted transition-smooth"
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
@@ -273,15 +165,6 @@ const Login = () => {
           </div>
 
           <div className="text-center mt-6">
-            {isLogin && (
-              <button
-                type="button"
-                onClick={handlePasswordReset}
-                className="text-sm text-muted-foreground hover:text-primary transition-smooth block mx-auto mb-4"
-              >
-                Forgot password?
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}

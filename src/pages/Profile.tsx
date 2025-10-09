@@ -123,16 +123,9 @@ const Profile = () => {
                       Message
                     </Link>
                   </Button>
-                  <Button
-                    onClick={() => setIsSubscribed(!isSubscribed)}
-                    className={`transition-smooth ${
-                      isSubscribed 
-                        ? "bg-green-600 hover:bg-green-700 text-white" 
-                        : "gradient-primary hover:opacity-90 neon-glow"
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 mr-2 ${isSubscribed ? "fill-current" : ""}`} />
-                    {isSubscribed ? "Subscribed" : "Subscribe"}
+                  <Button className="gradient-primary hover:opacity-90 transition-smooth neon-glow">
+                    <Heart className="w-4 h-4 mr-2" />
+                    Subscribe
                   </Button>
                 </div>
               </div>

@@ -1,21 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Lock, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useWeb3 } from "@/hooks/useWeb3";
-import { toast } from "@/hooks/use-toast";
-import React from "react";
 
 interface ProfileCardProps {
-  id: string;
+  id: number;
   name: string;
-  age?: number;
-  location?: string;
-  image?: string;
+  age: number;
+  location: string;
+  image: string;
   isLocked?: boolean;
   rating?: number;
   price?: string;
@@ -28,181 +22,24 @@ const ProfileCard = ({
   age, 
   location, 
   image, 
-  isLocked, 
-  rating, 
-  price, 
-  isOnline 
+  isLocked = true, 
+  rating = 4.8,
+  price = "$19.99",
+  isOnline = Math.random() > 0.5 
 }: ProfileCardProps) => {
-  const { user } = useAuth();
-  const { isConnected, subscribe: web3Subscribe, unsubscribe: web3Unsubscribe } = useWeb3();
   const [isLiked, setIsLiked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  // Intersection Observer for lazy loading
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '50px' }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  // Only fetch data when card is visible
-  useEffect(() => {
-    if (!user || !isVisible) return;
-
-    const checkLikeAndSubscription = async () => {
-      const [likeData, subData] = await Promise.all([
-        supabase
-          .from('likes')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('profile_id', id)
-          .maybeSingle(),
-        supabase
-          .from('subscriptions')
-          .select('id')
-          .eq('subscriber_id', user.id)
-          .eq('creator_id', id)
-          .eq('is_active', true)
-          .maybeSingle()
-      ]);
-
-      setIsLiked(!!likeData.data);
-      setIsSubscribed(!!subData.data);
-    };
-
-    checkLikeAndSubscription();
-  }, [user, id, isVisible]);
-
-  const handleLike = async () => {
-    if (!user) {
-      toast({
-        title: "Login required",
-        description: "Please login to like profiles.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      if (isLiked) {
-        await supabase
-          .from('likes')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('profile_id', id);
-        setIsLiked(false);
-      } else {
-        const { error } = await supabase
-          .from('likes')
-          .insert([{ user_id: user.id, profile_id: id }]);
-        if (error) throw error;
-        setIsLiked(true);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update like status.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSubscribe = async () => {
-    if (!user) {
-      toast({
-        title: "Login required",
-        description: "Please login to subscribe.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your Web3 wallet to subscribe.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (isSubscribed) {
-        // Unsubscribe via smart contract
-        await web3Unsubscribe(id);
-        
-        // Update Supabase record
-        await supabase
-          .from('subscriptions')
-          .delete()
-          .eq('subscriber_id', user.id)
-          .eq('creator_id', id);
-        
-        setIsSubscribed(false);
-        toast({
-          title: "Unsubscribed",
-          description: "You've unsubscribed from this creator.",
-        });
-      } else {
-        // Subscribe via smart contract (payment handled on-chain)
-        await web3Subscribe(id, price);
-
-        // Record subscription in Supabase for off-chain tracking
-        const { error: subError } = await supabase
-          .from('subscriptions')
-          .insert([{ 
-            subscriber_id: user.id, 
-            creator_id: id,
-            is_active: true
-          }]);
-        if (subError) throw subError;
-
-        setIsSubscribed(true);
-        toast({
-          title: "Subscribed!",
-          description: `You're now subscribed to ${name}.`,
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update subscription.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
-    <div ref={cardRef} className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
+    <div className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
       {/* Profile Image */}
-      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-        {!imageLoaded && <Skeleton className="absolute inset-0" />}
+      <div className="relative aspect-[3/4] overflow-hidden">
         <img
           src={image}
           alt={name}
-          onLoad={() => setImageLoaded(true)}
           className={`w-full h-full object-cover transition-smooth ${
             isLocked ? "profile-blur group-hover:filter-none" : ""
-          } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          }`}
         />
         
         {/* Online Status */}
@@ -233,7 +70,7 @@ const ProfileCard = ({
 
         {/* Like Button */}
         <button
-          onClick={handleLike}
+          onClick={() => setIsLiked(!isLiked)}
           className={`absolute bottom-3 right-3 p-2 rounded-full transition-smooth hover-scale ${
             isLiked
               ? "bg-primary text-white animate-pulse-neon"
@@ -251,7 +88,7 @@ const ProfileCard = ({
       <div className="absolute inset-x-0 bottom-0 p-4 text-white">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-lg font-semibold">{name}{age ? `, ${age}` : ""}</h3>
+            <h3 className="text-lg font-semibold">{name}, {age}</h3>
             <div className="flex items-center text-sm text-gray-300">
               <MapPin className="w-3 h-3 mr-1" />
               {location}
@@ -275,15 +112,14 @@ const ProfileCard = ({
           </Button>
           <Button
             size="sm"
-            onClick={handleSubscribe}
-            disabled={loading}
+            onClick={() => setIsSubscribed(!isSubscribed)}
             className={`flex-1 transition-smooth ${
               isSubscribed 
-                ? "bg-green-500 hover:bg-green-600 text-white border-green-500" 
+                ? "bg-green-600 hover:bg-green-700 text-white" 
                 : "gradient-primary hover:opacity-90 neon-glow"
             }`}
           >
-            {loading ? "..." : (isSubscribed ? "✓ Subscribed" : "Subscribe")}
+            {isSubscribed ? "Subscribed" : "Subscribe"}
           </Button>
         </div>
       </div>
@@ -291,4 +127,4 @@ const ProfileCard = ({
   );
 };
 
-export default React.memo(ProfileCard);
+export default ProfileCard;
