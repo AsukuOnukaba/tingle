@@ -1,93 +1,161 @@
-import http from "http";
+/**
+ * wallet-topup/index.ts
+ * Deno edge function to:
+ *  - create a pending transaction on Lovable backend (idempotent on reference)
+ *  - initialize a Paystack (or Stripe) payment intent and return authorization payload
+ *
+ * Expects JSON POST: { user_id, amount, currency?, email?, client_reference?, provider? }
+ *
+ * Environment variables (set in Supabase / environment):
+ *  - LOVABLE_CLOUD_URL
+ *  - LOVABLE_CLOUD_API_KEY
+ *  - PAYSTACK_SECRET
+ *  - STRIPE_SECRET (optional)
+ */
 
-const LOVABLE_CLOUD_URL = process.env.LOVABLE_CLOUD_URL ?? "";
-const LOVABLE_CLOUD_API_KEY = process.env.LOVABLE_CLOUD_API_KEY ?? "";
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET ?? "";
-const STRIPE_SECRET = process.env.STRIPE_SECRET ?? "";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-function jsonResponse(obj: any, status = 200) {
-  return new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
-}
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-http.createServer(async (req, res) => {
   try {
-    // validate env
+    const LOVABLE_CLOUD_URL = Deno.env.get("LOVABLE_CLOUD_URL") ?? "";
+    const LOVABLE_CLOUD_API_KEY = Deno.env.get("LOVABLE_CLOUD_API_KEY") ?? "";
+    const PAYSTACK_SECRET = Deno.env.get("PAYSTACK_SECRET") ?? "";
+    const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET") ?? "";
+
     if (!LOVABLE_CLOUD_URL || !LOVABLE_CLOUD_API_KEY) {
-      return jsonResponse({ error: "missing_backend_env" }, 500);
+      return new Response(JSON.stringify({ error: "missing_backend_env" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Parse JSON body from IncomingMessage
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    let body: any = {};
-    try {
-      body = JSON.parse(Buffer.concat(chunks).toString());
-    } catch {
-      return jsonResponse({ error: "invalid_json" }, 400);
-    }
-    const { user_id, amount, currency = "NGN", provider = "paystack", client_reference } = body;
-    if (!user_id || !amount || Number(amount) <= 0) return jsonResponse({ error: "invalid_input" }, 400);
 
-    // create pending transaction on Lovable Cloud (idempotent on reference)
-    const reference = client_reference ?? `topup_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    const body = await req.json().catch(() => ({} as any));
+    const {
+      user_id,
+      amount,
+      currency = "NGN",
+      email,
+      client_reference,
+      provider,
+    } = body as any;
+
+    if (!user_id || !amount || Number(amount) <= 0) {
+      return new Response(JSON.stringify({ error: "invalid_input" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const reference =
+      client_reference ?? `topup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Create pending transaction at Lovable backend (idempotent on reference)
     const createTxResp = await fetch(`${LOVABLE_CLOUD_URL}/internal/wallets/transactions`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "authorization": `Bearer ${LOVABLE_CLOUD_API_KEY}`
+        authorization: `Bearer ${LOVABLE_CLOUD_API_KEY}`,
       },
-      body: JSON.stringify({ user_id, amount, currency, type: "topup", reference })
+      body: JSON.stringify({
+        user_id,
+        amount: Number(amount),
+        currency,
+        type: "topup",
+        reference,
+      }),
     });
 
-    // try to parse backend response for useful error info
-    let createTxJson: any = null;
-    try { createTxJson = await createTxResp.json(); } catch { createTxJson = null; }
+    const createTxJson = await createTxResp.json().catch(() => null);
 
-    if (!createTxResp.ok) {
-      return jsonResponse({ error: "backend_error", status: createTxResp.status, detail: createTxJson ?? await createTxResp.text() }, 500);
+    // If Lovable backend fails, propagate a 502 back. If 409 / duplicate, we still continue (idempotency)
+    if (!createTxResp.ok && createTxResp.status !== 409) {
+      return new Response(
+        JSON.stringify({ error: "backend_create_tx_failed", details: createTxJson }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // initialize provider payment
+    // provider-specific payment init
     if (provider === "stripe") {
-      // create PaymentIntent (use cents)
-      const piResp = await fetch("https://api.stripe.com/v1/payment_intents", {
+      // Stripe payment intent (server-side secret must be set)
+      if (!STRIPE_SECRET) {
+        return new Response(JSON.stringify({ error: "missing_stripe_secret" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const stripeAmount = Math.round(Number(amount) * 100);
+      const params = new URLSearchParams();
+      params.append("amount", String(stripeAmount));
+      params.append("currency", (currency ?? "ngn").toLowerCase());
+      // keep it simple: payment_method_types[]=card
+      params.append("payment_method_types[]", "card");
+      params.append("metadata[reference]", reference);
+
+      const initResp = await fetch("https://api.stripe.com/v1/payment_intents", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${STRIPE_SECRET}`,
-          "Content-Type": "application/x-www-form-urlencoded"
+          Authorization: `Bearer ${STRIPE_SECRET}`,
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({
-          amount: String(Math.round(Number(amount) * 100)), // cents
-          currency: currency.toLowerCase(),
-          // set metadata using stripe form-encoding format
-          "metadata[reference]": reference
-        })
+        body: params.toString(),
       });
-      const piJson = await piResp.json().catch(() => ({ error: "invalid_response" }));
-      return jsonResponse({ provider: "stripe", reference, payment_intent: piJson }, piResp.ok ? 200 : 502);
-    } else {
-      // Paystack initialize - amount in kobo (multiply before rounding)
-      const paystackAmount = Math.round(Number(amount) * 100);
-      const initResp = await fetch("https://api.paystack.co/transaction/initialize", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${PAYSTACK_SECRET}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email: body.email ?? "no-reply@example.com",
-          amount: paystackAmount,
-          currency,
-          metadata: { reference }
-        })
-      });
+
       const initJson = await initResp.json().catch(() => ({ error: "invalid_response" }));
-      return jsonResponse({ provider: "paystack", reference, authorization: initJson }, initResp.ok ? 200 : 502);
+      return new Response(JSON.stringify({ provider: "stripe", reference, authorization: initJson }), {
+        status: initResp.ok ? 200 : 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    // Default: Paystack initialize
+    if (!PAYSTACK_SECRET) {
+      return new Response(JSON.stringify({ error: "missing_paystack_secret" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const paystackAmount = Math.round(Number(amount) * 100); // convert to kobo
+    const initResp = await fetch("https://api.paystack.co/transaction/initialize", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email ?? "no-reply@example.com",
+        amount: paystackAmount,
+        currency,
+        metadata: { reference },
+      }),
+    });
+
+    const initJson = await initResp.json().catch(() => ({ error: "invalid_response" }));
+    return new Response(JSON.stringify({ provider: "paystack", reference, authorization: initJson }), {
+      status: initResp.ok ? 200 : 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("wallet-topup error:", err);
-    return jsonResponse({ error: "server_error" }, 500);
+    return new Response(JSON.stringify({ error: "server_error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
