@@ -53,7 +53,7 @@ export const WalletDisplay = () => {
   return (
     <div className="flex items-center gap-2 glass-card px-4 py-2 rounded-full">
       <Wallet className="w-4 h-4 text-primary" />
-      <span className="font-semibold">${balance.toFixed(2)}</span>
+      <span className="font-semibold">₦{balance.toFixed(2)}</span>
     </div>
   );
 };

@@ -58,8 +58,10 @@ const Wallet = () => {
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMethod, setWithdrawMethod] = useState<"bank" | "bitcoin" | "paystack">("bank");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankCode, setBankCode] = useState("");
+  const [bitcoinAddress, setbitcoinAddress] = useState("");
   const [transactions, setTransactions] = useState<any[]>([]);
 
   useEffect(() => {
@@ -166,16 +168,20 @@ const Wallet = () => {
       
       const { data, error } = await supabase.functions.invoke('wallet-topup', {
         body: {
+          user_id: user.id,
           amount: numericAmount,
+          currency: "NGN",
           email: user.email,
+          provider: "paystack"
         },
       });
 
       if (error) throw error;
 
-      if (data.authorization_url) {
-        // Redirect to Paystack payment page
-        window.location.href = data.authorization_url;
+      if (data?.authorization?.data?.authorization_url) {
+        window.location.href = data.authorization.data.authorization_url;
+      } else {
+        throw new Error("Failed to get payment URL");
       }
     } catch (error: any) {
       console.error('Top-up error:', error);
@@ -190,10 +196,28 @@ const Wallet = () => {
   };
 
   const handleWithdraw = async () => {
-    if (!user || !withdrawAmount || !accountNumber || !bankCode) {
+    if (!user || !withdrawAmount) {
       toast({
         title: "Invalid input",
-        description: "Please fill in all withdrawal details.",
+        description: "Please enter withdrawal amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (withdrawMethod === "bank" && (!accountNumber || !bankCode)) {
+      toast({
+        title: "Invalid input",
+        description: "Please fill in all bank details.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (withdrawMethod === "bitcoin" && !bitcoinAddress) {
+      toast({
+        title: "Invalid input",
+        description: "Please enter Bitcoin address.",
         variant: "destructive",
       });
       return;
@@ -209,14 +233,18 @@ const Wallet = () => {
           description: "You don't have enough funds to withdraw.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
       const { data, error } = await supabase.functions.invoke('wallet-withdraw', {
         body: {
+          user_id: user.id,
           amount: numericAmount,
+          method: withdrawMethod,
           account_number: accountNumber,
           bank_code: bankCode,
+          bitcoin_address: bitcoinAddress,
         },
       });
 
@@ -224,17 +252,18 @@ const Wallet = () => {
 
       toast({
         title: "Withdrawal successful!",
-        description: `$${data.net_amount.toFixed(2)} will be sent to your account (Fee: $${data.fee.toFixed(2)}).`,
+        description: `₦${data.net_amount.toFixed(2)} will be sent (Fee: ₦${data.fee.toFixed(2)}).`,
       });
       
       setWithdrawAmount("");
       setAccountNumber("");
       setBankCode("");
-    } catch (error) {
+      setbitcoinAddress("");
+    } catch (error: any) {
       console.error('Withdrawal error:', error);
       toast({
         title: "Error",
-        description: "Failed to process withdrawal. Please try again.",
+        description: error?.message || "Failed to process withdrawal. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -268,7 +297,7 @@ const Wallet = () => {
               </div>
               <div className="text-sm text-muted-foreground mb-2">Available Balance</div>
               <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                ${balance.toFixed(2)}
+                ₦{balance.toFixed(2)}
               </div>
               <div className="flex gap-4 justify-center">
                 <Button 
@@ -320,24 +349,24 @@ const Wallet = () => {
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        onClick={() => setAmount("10")}
+                        onClick={() => setAmount("1000")}
                         className="bg-muted/50 border-border/50 hover:bg-muted"
                       >
-                        $10
+                        ₦1000
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => setAmount("50")}
+                        onClick={() => setAmount("5000")}
                         className="bg-muted/50 border-border/50 hover:bg-muted"
                       >
-                        $50
+                        ₦5000
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => setAmount("100")}
+                        onClick={() => setAmount("10000")}
                         className="bg-muted/50 border-border/50 hover:bg-muted"
                       >
-                        $100
+                        ₦10000
                       </Button>
                     </div>
                   </div>
@@ -393,7 +422,7 @@ const Wallet = () => {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
-                    <Label htmlFor="withdraw-amount">Amount</Label>
+                    <Label htmlFor="withdraw-amount">Amount (NGN)</Label>
                     <Input
                       id="withdraw-amount"
                       type="number"
@@ -403,43 +432,102 @@ const Wallet = () => {
                       className="bg-muted/50 border-border/50"
                     />
                     <p className="text-sm text-muted-foreground mt-2">
-                      Fee: 20% • You will receive: ${withdrawAmount ? (parseFloat(withdrawAmount) * 0.8).toFixed(2) : '0.00'}
+                      Platform Fee: 20% • You will receive: ₦{withdrawAmount ? (parseFloat(withdrawAmount) * 0.8).toFixed(2) : '0.00'}
                     </p>
                   </div>
-                  
+
                   <div>
-                    <Label htmlFor="account-number">Account Number</Label>
-                    <Input
-                      id="account-number"
-                      type="text"
-                      placeholder="0123456789"
-                      value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
-                      className="bg-muted/50 border-border/50"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="bank-code">Bank Code</Label>
-                    <Input
-                      id="bank-code"
-                      type="text"
-                      placeholder="e.g., 058 for GTBank"
-                      value={bankCode}
-                      onChange={(e) => setBankCode(e.target.value)}
-                      className="bg-muted/50 border-border/50"
-                    />
-                    <p className="text-sm text-muted-foreground mt-2">
-                      <a 
-                        href="https://paystack.com/docs/payments/bank-codes" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
+                    <Label>Withdrawal Method</Label>
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      <Button
+                        type="button"
+                        variant={withdrawMethod === "bank" ? "default" : "outline"}
+                        onClick={() => setWithdrawMethod("bank")}
+                        className={withdrawMethod === "bank" ? "gradient-primary" : ""}
                       >
-                        Find your bank code here
-                      </a>
-                    </p>
+                        <Banknote className="w-4 h-4 mr-2" />
+                        Bank
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={withdrawMethod === "bitcoin" ? "default" : "outline"}
+                        onClick={() => setWithdrawMethod("bitcoin")}
+                        className={withdrawMethod === "bitcoin" ? "gradient-primary" : ""}
+                      >
+                        <Bitcoin className="w-4 h-4 mr-2" />
+                        Bitcoin
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={withdrawMethod === "paystack" ? "default" : "outline"}
+                        onClick={() => setWithdrawMethod("paystack")}
+                        className={withdrawMethod === "paystack" ? "gradient-primary" : ""}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Card
+                      </Button>
+                    </div>
                   </div>
+                  
+                  {withdrawMethod === "bank" && (
+                    <>
+                      <div>
+                        <Label htmlFor="account-number">Account Number</Label>
+                        <Input
+                          id="account-number"
+                          type="text"
+                          placeholder="0123456789"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          className="bg-muted/50 border-border/50"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="bank-code">Bank Code</Label>
+                        <Input
+                          id="bank-code"
+                          type="text"
+                          placeholder="e.g., 058 for GTBank"
+                          value={bankCode}
+                          onChange={(e) => setBankCode(e.target.value)}
+                          className="bg-muted/50 border-border/50"
+                        />
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <a 
+                            href="https://paystack.com/docs/payments/bank-codes" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            Find your bank code here
+                          </a>
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {withdrawMethod === "bitcoin" && (
+                    <div>
+                      <Label htmlFor="bitcoin-address">Bitcoin Address</Label>
+                      <Input
+                        id="bitcoin-address"
+                        type="text"
+                        placeholder="bc1q..."
+                        value={bitcoinAddress}
+                        onChange={(e) => setbitcoinAddress(e.target.value)}
+                        className="bg-muted/50 border-border/50"
+                      />
+                    </div>
+                  )}
+
+                  {withdrawMethod === "paystack" && (
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground">
+                        Funds will be transferred to your Paystack account
+                      </p>
+                    </div>
+                  )}
 
                   <Button 
                     onClick={handleWithdraw} 
@@ -468,8 +556,8 @@ const Wallet = () => {
                       {transactions.map((tx) => (
                         <div key={tx.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                           <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-full ${tx.type === 'deposit' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                              {tx.type === 'deposit' ? (
+                            <div className={`p-2 rounded-full ${tx.type === 'topup' ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                              {tx.type === 'topup' ? (
                                 <ArrowDownLeft className="w-4 h-4 text-green-500" />
                               ) : (
                                 <ArrowUpRight className="w-4 h-4 text-red-500" />
@@ -483,8 +571,8 @@ const Wallet = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className={`font-bold ${tx.type === 'deposit' ? 'text-green-500' : 'text-red-500'}`}>
-                              {tx.type === 'deposit' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+                            <div className={`font-bold ${tx.type === 'topup' ? 'text-green-500' : 'text-red-500'}`}>
+                              {tx.type === 'topup' ? '+' : '-'}₦{Math.abs(tx.amount).toFixed(2)}
                             </div>
                             <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
                               {tx.status}

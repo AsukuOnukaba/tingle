@@ -89,6 +89,51 @@ const Login = () => {
     }));
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/explore`
+        }
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: "Google login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!formData.email) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email to reset password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/explore`
+      });
+      if (error) throw error;
+      toast({
+        title: "Reset email sent",
+        description: "Check your email for password reset instructions.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Reset failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated Background */}
@@ -212,7 +257,9 @@ const Login = () => {
             </div>
 
             <Button
+              type="button"
               variant="outline"
+              onClick={handleGoogleLogin}
               className="w-full mt-4 bg-muted/50 border-border/50 hover:bg-muted transition-smooth"
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
@@ -226,6 +273,15 @@ const Login = () => {
           </div>
 
           <div className="text-center mt-6">
+            {isLogin && (
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                className="text-sm text-muted-foreground hover:text-primary transition-smooth block mx-auto mb-4"
+              >
+                Forgot password?
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
