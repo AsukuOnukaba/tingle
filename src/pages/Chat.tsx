@@ -36,17 +36,18 @@ const mapDbMessageToMessage = (row: DBMessage, currentUserId: string | null): Me
 };
 
 const Chat = () => {
-  const { id: paramId } = useParams();
-  const { currentProfileId } = useCurrentProfile();
-  const profileId = paramId || currentProfileId || "1";
-  const profile = getProfile(Number(profileId));
   const { recipientId } = useParams<{ recipientId: string }>();
-  const conversationId = [currentProfileId, recipientId].sort().join("_");
+  const { currentProfileId } = useCurrentProfile();
+  
+  const profile = getProfile(Number(recipientId));
   const [isTyping, setIsTyping] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Generate consistent conversation ID
+  const conversationId = [currentProfileId, recipientId].sort().join("_");
 
   // ---------- Scroll to Bottom ----------
   const scrollToBottom = () => {
@@ -54,16 +55,16 @@ const Chat = () => {
   };
 
   // ---------- Fetch Messages ----------
-  // Create a typed helper function
   useEffect(() => {
+    if (!conversationId || !currentProfileId) return;
+
     let cancelled = false;
     const fetchMessages = async () => {
       try {
         const { data, error } = await supabase
           .from("messages")
-          // use DB column names; select only what you need or use "*"
-          .select("id, conversation_id, sender_id, recipient_id, text, type, created_at")
-          .eq("conversation_id", String(profileId))
+          .select("*")
+          .eq("conversation_id", conversationId)
           .order("created_at", { ascending: true });
 
         if (error) {
@@ -72,14 +73,12 @@ const Chat = () => {
         }
 
         if (data && !cancelled) {
-          // data is inferred from typed client as DBMessage[] | null
           const formatted: Message[] = (data as DBMessage[]).map((m) =>
             mapDbMessageToMessage(m, currentProfileId ?? null)
           );
 
           setMessages(formatted);
           scrollToBottom();
-
         }
       } catch (err) {
         console.error("Fetch messages failed:", err);
@@ -90,26 +89,26 @@ const Chat = () => {
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
+  }, [conversationId, currentProfileId]);
 
   // ---------- Subscribe to Real-time Messages ----------
   useEffect(() => {
-    if (!profileId) return;
+    if (!conversationId || !currentProfileId) return;
 
-    // const isNumeric = /^\d+$/.test(String(profileId));
-    const conversationId = [currentProfileId, recipientId].sort().join("_");
-    const filterVal = conversationId;
-
-
-    // const channelName = `chat_${profileId}`;
     const channel = supabase
-      .channel(`chat_${profileId}`)
+      .channel(`chat_${conversationId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${filterVal}` },
+        { 
+          event: "INSERT", 
+          schema: "public", 
+          table: "messages", 
+          filter: `conversation_id=eq.${conversationId}` 
+        },
         (payload) => {
           const newMsg = payload.new as DBMessage;
           if (!newMsg) return;
+          
           const newMessageObj: Message = {
             id: String(newMsg.id),
             text: newMsg.text ?? "",
@@ -119,40 +118,29 @@ const Chat = () => {
           };
           setMessages((prev) => [...prev, newMessageObj]);
           scrollToBottom();
-
         }
       )
-
       .subscribe((status) => {
-        console.debug("Realtime subscribe status:", status);
+        console.log("Realtime subscribe status:", status);
       });
 
     return () => {
-      try {
-        channel.unsubscribe().catch(() => { });
-        // supabase.removeChannel may or may not be available depending on client version
-        try { supabase.removeChannel(channel); } catch { }
-      } catch (e) {
-        console.error("Error cleaning up channel:", e);
-      }
+      supabase.removeChannel(channel);
     };
-  }, [profileId]);
+  }, [conversationId, currentProfileId]);
 
   // ---------- Send Message ----------
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !currentProfileId || !recipientId) return;
 
     const messagePayload = {
-      conversation_id: profileId, // or whatever your conversation reference is
+      conversation_id: conversationId,
       sender_id: currentProfileId,
       recipient_id: recipientId,
-      text: newMessage,
+      text: newMessage.trim(),
       type: "text",
-      created_at: new Date().toISOString(),
       is_read: false,
-      metadata: null,
-      creator_id: null, // if optional
     };
 
     // Optimistic update
@@ -198,16 +186,15 @@ const Chat = () => {
 
   // ---------- Handle Tip ----------
   const handleTip = async (amount: string) => {
+    if (!currentProfileId || !recipientId) return;
+
     const tipPayload: Database["public"]["Tables"]["messages"]["Insert"] = {
-      conversation_id: profileId, // instead of chat_id
-      text: newMessage,
-      sender_id: currentProfileId, // instead of sender
-      recipient_id: recipientId, // required field
+      conversation_id: conversationId,
+      text: `Sent a $${amount} tip`,
+      sender_id: currentProfileId,
+      recipient_id: recipientId,
       type: "tip",
-      created_at: new Date().toISOString(),
       is_read: false,
-      metadata: null,
-      creator_id: null, // optional
     };
 
     const tempTip: Message = {
@@ -258,7 +245,7 @@ const Chat = () => {
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button asChild variant="ghost" size="sm" className="hover:bg-muted/50 transition-smooth">
-                <Link to={`/profile/${profileId}`}>
+                <Link to={`/profile/${recipientId}`}>
                   <ArrowLeft className="w-4 h-4" />
                 </Link>
               </Button>

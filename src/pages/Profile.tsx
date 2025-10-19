@@ -54,18 +54,16 @@ const Profile = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('subscriptions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('subscriber_id', user.id)
         .eq('creator_id', id)
-        .eq('status', 'active')
-        .single();
+        .eq('is_active', true)
+        .maybeSingle();
 
       if (data && !error) {
         setIsSubscribed(true);
-        const tierIndex = profile.tiers.findIndex(t => t.name.toLowerCase() === data.tier);
-        if (tierIndex !== -1) setSelectedTier(tierIndex);
       }
     } catch (error) {
       console.error('Error checking subscription:', error);
@@ -86,20 +84,15 @@ const Profile = () => {
     setLoading(true);
     try {
       const selectedTierData = profile.tiers[selectedTier];
-      const amount = parseFloat(selectedTierData.price.replace('$', ''));
 
-      // Process subscription directly with wallet deduction
-      const { data: subscription, error: subError } = await supabase
+      // Process subscription
+      const { error: subError } = await (supabase as any)
         .from('subscriptions')
-        .upsert({
-          user_id: user.id,
+        .insert({
+          subscriber_id: user.id,
           creator_id: id,
-          tier: selectedTierData.name.toLowerCase(),
-          amount: amount,
-          status: 'active'
-        })
-        .select()
-        .single();
+          is_active: true,
+        });
 
       if (subError) throw subError;
 
@@ -120,10 +113,10 @@ const Profile = () => {
     
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('subscriptions')
-        .update({ status: 'cancelled', end_date: new Date().toISOString() })
-        .eq('user_id', user.id)
+        .update({ is_active: false })
+        .eq('subscriber_id', user.id)
         .eq('creator_id', id);
 
       if (error) throw error;
