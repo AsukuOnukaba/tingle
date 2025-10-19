@@ -5,19 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link, useParams } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-
-// Import profile images
-import profile1 from "@/assets/profiles/profile-1.jpg";
+import { getProfile } from "@/lib/profileData";
 
 const PremiumChat = () => {
   const { id } = useParams();
+  const profile = getProfile(Number(id));
   const [message, setMessage] = useState("");
 
   // Mock premium chat messages
   const messages = [
     {
       id: 1,
-      sender: "emma",
+      sender: "creator",
       content: "Hey babe! Thanks for subscribing to my premium tier! 💕",
       timestamp: "2:30 PM",
       isPremium: true
@@ -25,12 +24,12 @@ const PremiumChat = () => {
     {
       id: 2,
       sender: "user",
-      content: "Hi Emma! I'm so excited to be here ✨",
+      content: `Hi ${profile.name}! I'm so excited to be here ✨`,
       timestamp: "2:31 PM"
     },
     {
       id: 3,
-      sender: "emma",
+      sender: "creator",
       content: "I have some exclusive photos I took just for you today 📸",
       timestamp: "2:32 PM",
       isPremium: true,
@@ -38,7 +37,7 @@ const PremiumChat = () => {
     },
     {
       id: 4,
-      sender: "emma",
+      sender: "creator",
       content: "What kind of content would you like to see more of? I love taking requests from my premium subscribers 😘",
       timestamp: "2:33 PM",
       isPremium: true
@@ -51,7 +50,7 @@ const PremiumChat = () => {
     },
     {
       id: 6,
-      sender: "emma",
+      sender: "creator",
       content: "Perfect! I'm actually doing a photoshoot tomorrow. I'll make sure to capture some exclusive behind-the-scenes moments just for you! 🎬✨",
       timestamp: "2:36 PM",
       isPremium: true
@@ -86,28 +85,30 @@ const PremiumChat = () => {
               </Link>
             </Button>
             
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <img
-                  src={profile1}
-                  alt="Emma"
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs flex items-center">
-                  <div className="w-1.5 h-1.5 bg-white rounded-full mr-1 animate-pulse" />
-                  Live
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <img
+                    src={profile.image}
+                    alt={profile.name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  {profile.isOnline && (
+                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs flex items-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full mr-1 animate-pulse" />
+                      Live
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h2 className="font-semibold">{profile.name}</h2>
+                    <Crown className="w-4 h-4 text-primary" />
+                    <Badge className="gradient-primary text-white text-xs">Premium</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Usually replies instantly</p>
                 </div>
               </div>
-              
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="font-semibold">Emma</h2>
-                  <Crown className="w-4 h-4 text-primary" />
-                  <Badge className="gradient-primary text-white text-xs">Premium</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">Usually replies instantly</p>
-              </div>
-            </div>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -129,7 +130,7 @@ const PremiumChat = () => {
             <Crown className="w-12 h-12 mx-auto mb-3 text-primary" />
             <h3 className="text-xl font-semibold mb-2">Premium Chat Access</h3>
             <p className="text-muted-foreground">
-              You have unlimited messaging access with Emma. Enjoy exclusive conversations and priority responses!
+              You have unlimited messaging access with {profile.name}. Enjoy exclusive conversations and priority responses!
             </p>
           </div>
 
@@ -140,14 +141,14 @@ const PremiumChat = () => {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className={`max-w-xs lg:max-w-md ${msg.sender === "user" ? "order-2" : "order-1"}`}>
-                {msg.sender === "emma" && (
+                {msg.sender === "creator" && (
                   <div className="flex items-center space-x-2 mb-2">
                     <img
-                      src={profile1}
-                      alt="Emma"
+                      src={profile.image}
+                      alt={profile.name}
                       className="w-6 h-6 rounded-full object-cover"
                     />
-                    <span className="text-sm font-medium">Emma</span>
+                    <span className="text-sm font-medium">{profile.name}</span>
                     {msg.isPremium && (
                       <Crown className="w-3 h-3 text-primary" />
                     )}

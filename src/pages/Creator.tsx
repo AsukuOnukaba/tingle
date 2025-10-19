@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface CreatorFormData {
@@ -164,6 +165,7 @@ const Creator = () => {
       newErrors.monthlyPrice = "Monthly price must be at least $5";
     }
     if (!formData.profilePhoto) newErrors.profilePhoto = "Profile photo is required";
+    if (!formData.governmentId) newErrors.governmentId = "Government ID is required";
 
     // Age validation (must be 18+)
     if (formData.age < 18) {
@@ -186,7 +188,7 @@ const Creator = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -198,15 +200,154 @@ const Creator = () => {
       return;
     }
 
-    // Simulate form submission
-    toast({
-      title: "Application submitted successfully!",
-      description: "You will be redirected to the pending review page.",
-    });
+    try {
+      // Send notification email to admin
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Authentication required",
+          description: "Please log in to submit your application.",
+        });
+        return;
+      }
 
-    setTimeout(() => {
-      navigate("/creator/pending");
-    }, 1500);
+      let profilePictureUrl = '';
+      let governmentIdUrl = '';
+
+      // Upload profile photo if provided
+      if (formData.profilePhoto) {
+        const fileExt = formData.profilePhoto.name.split('.').pop();
+        const fileName = `${session.user.id}-profile-${Date.now()}.${fileExt}`;
+        const filePath = `creator-applications/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('uploads')
+          .upload(filePath, formData.profilePhoto);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast({
+            variant: "destructive",
+            title: "Upload failed",
+            description: "Failed to upload profile photo. Please try again.",
+          });
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('uploads')
+          .getPublicUrl(filePath);
+
+        profilePictureUrl = publicUrl;
+      }
+
+      // Upload government ID if provided
+      if (formData.governmentId) {
+        const fileExt = formData.governmentId.name.split('.').pop();
+        const fileName = `${session.user.id}-govid-${Date.now()}.${fileExt}`;
+        const filePath = `creator-applications/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('uploads')
+          .upload(filePath, formData.governmentId);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast({
+            variant: "destructive",
+            title: "Upload failed",
+            description: "Failed to upload government ID. Please try again.",
+          });
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('uploads')
+          .getPublicUrl(filePath);
+
+        governmentIdUrl = publicUrl;
+      }
+
+      const applicationData = {
+        fullLegalName: formData.fullLegalName,
+        displayName: formData.displayName,
+        age: formData.age,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        country: formData.country,
+        city: formData.city,
+        email: formData.email,
+        bio: formData.bio,
+        contentType: formData.contentType,
+        monthlyPrice: formData.monthlyPrice,
+        profilePictureUrl,
+        instagramUrl: formData.instagramUrl,
+        tiktokUrl: formData.tiktokUrl,
+        twitterUrl: formData.twitterUrl,
+      };
+
+      // Save application to database
+      const { error: dbError } = await supabase
+        .from('creator_applications')
+        .insert({
+          user_id: session.user.id,
+          full_legal_name: formData.fullLegalName,
+          display_name: formData.displayName,
+          age: formData.age,
+          date_of_birth: formData.dateOfBirth,
+          gender: formData.gender,
+          country: formData.country,
+          city: formData.city,
+          email: formData.email,
+          bio: formData.bio,
+          content_type: formData.contentType,
+          monthly_price: parseFloat(formData.monthlyPrice),
+          profile_photo_url: profilePictureUrl,
+          government_id_url: governmentIdUrl,
+          instagram_url: formData.instagramUrl,
+          tiktok_url: formData.tiktokUrl,
+          twitter_url: formData.twitterUrl,
+          status: 'pending'
+        });
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+        toast({
+          variant: "destructive",
+          title: "Submission failed",
+          description: "Failed to save application. Please try again.",
+        });
+        return;
+      }
+
+      // Send notification email to admin
+      const { error: emailError } = await supabase.functions.invoke('notify-creator-application', {
+        body: applicationData,
+      });
+
+      if (emailError) {
+        console.error('Error sending notification:', emailError);
+        // Don't block the submission if email fails
+      }
+
+      toast({
+        title: "Application submitted successfully!",
+        description: "You will be redirected to the pending review page. Admin has been notified.",
+      });
+
+      setTimeout(() => {
+        navigate("/creator/pending");
+      }, 1500);
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast({
+        variant: "destructive",
+        title: "Submission error",
+        description: "There was an error submitting your application. Please try again.",
+      });
+    }
   };
 
   const FileUploadField = ({ 
@@ -635,10 +776,11 @@ const Creator = () => {
                   </div>
 
                   <FileUploadField
-                    label="Government ID Upload (Optional)"
+                    label="Government ID Upload"
                     name="governmentId"
-                    accept="image/*"
-                    description="Driver's license, passport, or state ID for age verification. This is optional but helps speed up approval."
+                    accept="image/*,.pdf"
+                    required={true}
+                    description="Driver's license, passport, or state ID for age verification (PDF or image). Required for approval."
                   />
                 </div>
 

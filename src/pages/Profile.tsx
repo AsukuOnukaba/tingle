@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Heart, MessageCircle, DollarSign, Star, MapPin, Calendar, Camera, Lock, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,42 +6,137 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import Navigation from "@/components/Navigation";
-
-// Import profile images
-import profile1 from "@/assets/profiles/profile-1.jpg";
-import profile2 from "@/assets/profiles/profile-2.jpg";
-import profile3 from "@/assets/profiles/profile-3.jpg";
-
-const fakeProfiles = {
-  1: {
-    id: 1,
-    name: "Emma",
-    age: 25,
-    location: "New York, NY",
-    image: profile1,
-    bio: "Professional model and content creator. I love connecting with my fans and sharing exclusive content. Join me for behind-the-scenes content, personal messages, and so much more! ✨",
-    rating: 4.9,
-    subscribers: "12.5K",
-    posts: 156,
-    joined: "January 2023",
-    isOnline: true,
-    subscriptionPrice: "$24.99",
-    photos: [profile1, profile2, profile3],
-    tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$24.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$49.99", features: ["All content", "Video calls", "Personal attention"] },
-    ]
-  }
-};
+import { getProfile } from "@/lib/profileData";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import { PurchaseConfirmationModal } from "@/components/PurchaseConfirmationModal";
 
 const Profile = () => {
   const { id } = useParams();
+  const { user } = useAuth();
+  const { setCurrentProfileId } = useCurrentProfile();
   const [activeTab, setActiveTab] = useState("photos");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [selectedTier, setSelectedTier] = useState(1);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
 
-  const profile = fakeProfiles[Number(id) as keyof typeof fakeProfiles] || fakeProfiles[1];
+  const profile = getProfile(Number(id));
+
+  useEffect(() => {
+    setCurrentProfileId(id || "1");
+    checkSubscription();
+    fetchWalletBalance();
+  }, [id, setCurrentProfileId]);
+
+  const fetchWalletBalance = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (data && !error) {
+        setWalletBalance(data.balance);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+    }
+  };
+
+  const checkSubscription = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('creator_id', id)
+        .eq('status', 'active')
+        .single();
+
+      if (data && !error) {
+        setIsSubscribed(true);
+        const tierIndex = profile.tiers.findIndex(t => t.name.toLowerCase() === data.tier);
+        if (tierIndex !== -1) setSelectedTier(tierIndex);
+      }
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+    }
+  };
+
+  const handleSubscribe = () => {
+    if (!user) {
+      toast.error("Please login to subscribe");
+      return;
+    }
+    setShowPurchaseModal(true);
+  };
+
+  const handleSubscriptionPurchase = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const selectedTierData = profile.tiers[selectedTier];
+      const amount = parseFloat(selectedTierData.price.replace('$', ''));
+
+      // Process subscription directly with wallet deduction
+      const { data: subscription, error: subError } = await supabase
+        .from('subscriptions')
+        .upsert({
+          user_id: user.id,
+          creator_id: id,
+          tier: selectedTierData.name.toLowerCase(),
+          amount: amount,
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (subError) throw subError;
+
+      setIsSubscribed(true);
+      toast.success(`Successfully subscribed to ${profile.name}!`);
+      setShowPurchaseModal(false);
+      fetchWalletBalance();
+    } catch (error: any) {
+      console.error('Subscription error:', error);
+      toast.error(error.message || "Failed to process subscription");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ status: 'cancelled', end_date: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('creator_id', id);
+
+      if (error) throw error;
+
+      setIsSubscribed(false);
+      toast.success("Successfully unsubscribed");
+    } catch (error: any) {
+      console.error('Unsubscribe error:', error);
+      toast.error(error.message || "Failed to unsubscribe");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -118,22 +213,31 @@ const Profile = () => {
                     variant="outline"
                     className="bg-muted/50 border-border/50 hover:bg-muted transition-smooth"
                   >
-                    <Link to="/chat">
+                    <Link to={`/chat/${id}`}>
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Message
                     </Link>
                   </Button>
-                  <Button
-                    onClick={() => setIsSubscribed(!isSubscribed)}
-                    className={`transition-smooth ${
-                      isSubscribed 
-                        ? "bg-green-600 hover:bg-green-700 text-white" 
-                        : "gradient-primary hover:opacity-90 neon-glow"
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 mr-2 ${isSubscribed ? "fill-current" : ""}`} />
-                    {isSubscribed ? "Subscribed" : "Subscribe"}
-                  </Button>
+                  {isSubscribed ? (
+                    <Button 
+                      onClick={handleUnsubscribe}
+                      disabled={loading}
+                      variant="outline"
+                      className="border-primary/50 hover:bg-primary/10 transition-smooth"
+                    >
+                      <Heart className="w-4 h-4 mr-2 fill-current text-primary" />
+                      Unsubscribe
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleSubscribe}
+                      disabled={loading}
+                      className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
+                    >
+                      <Heart className="w-4 h-4 mr-2" />
+                      Subscribe
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -175,6 +279,27 @@ const Profile = () => {
             </TabsList>
 
             <TabsContent value="photos">
+              <div className="mb-6 grid grid-cols-2 gap-4">
+                <Button
+                  asChild
+                  className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
+                >
+                  <Link to={`/premium/${id}/gallery`}>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Premium Gallery
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
+                >
+                  <Link to={`/premium/${id}/chat`}>
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Premium Chat
+                  </Link>
+                </Button>
+              </div>
+              
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {profile.photos.map((photo, index) => (
                   <div key={index} className="relative aspect-square group cursor-pointer">
@@ -194,14 +319,21 @@ const Profile = () => {
                 ))}
                 
                 {/* Subscribe CTA */}
-                <div className="aspect-square glass-card rounded-xl flex flex-col items-center justify-center text-center p-6">
-                  <Lock className="w-8 h-8 text-primary mb-3" />
-                  <h3 className="font-semibold mb-2">Unlock All Content</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Subscribe to see {profile.posts}+ exclusive photos and videos</p>
-                  <Button size="sm" className="gradient-primary hover:opacity-90 transition-smooth">
-                    Subscribe Now
-                  </Button>
-                </div>
+                {!isSubscribed && (
+                  <div className="aspect-square glass-card rounded-xl flex flex-col items-center justify-center text-center p-6">
+                    <Lock className="w-8 h-8 text-primary mb-3" />
+                    <h3 className="font-semibold mb-2">Unlock All Content</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Subscribe to see {profile.posts}+ exclusive photos and videos</p>
+                    <Button 
+                      size="sm" 
+                      onClick={handleSubscribe}
+                      disabled={loading}
+                      className="gradient-primary hover:opacity-90 transition-smooth"
+                    >
+                      Subscribe Now
+                    </Button>
+                  </div>
+                )}
               </div>
             </TabsContent>
 
@@ -262,13 +394,18 @@ const Profile = () => {
                         ))}
                       </ul>
                       <Button
+                        onClick={() => {
+                          setSelectedTier(index);
+                          if (!isSubscribed) handleSubscribe();
+                        }}
+                        disabled={loading}
                         className={`w-full transition-smooth ${
-                          selectedTier === index
+                          selectedTier === index && isSubscribed
                             ? "gradient-primary hover:opacity-90 neon-glow"
                             : "variant-outline bg-muted/50 border-border/50 hover:bg-muted"
                         }`}
                       >
-                        {selectedTier === index ? "Selected" : "Choose Plan"}
+                        {selectedTier === index && isSubscribed ? "Current Plan" : "Choose Plan"}
                       </Button>
                     </CardContent>
                   </Card>
@@ -278,6 +415,16 @@ const Profile = () => {
           </Tabs>
         </div>
       </div>
+
+      <PurchaseConfirmationModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        contentId={id || ""}
+        contentTitle={`${profile.name} - ${profile.tiers[selectedTier].name} Subscription`}
+        price={parseFloat(profile.tiers[selectedTier].price.replace('$', ''))}
+        walletBalance={walletBalance}
+        onPurchaseSuccess={handleSubscriptionPurchase}
+      />
     </div>
   );
 };

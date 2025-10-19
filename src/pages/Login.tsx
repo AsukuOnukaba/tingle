@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,22 +19,51 @@ const Login = () => {
     email: "",
     password: "",
     confirmPassword: "",
+    username: "",
   });
 
   useEffect(() => {
-    if (user) {
-      navigate('/explore');
-    }
-  }, [user, navigate]);
+    // Check if user is already logged in
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate("/explore");
+      }
+    };
+    checkUser();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    // Validate inputs
+    const authSchema = z.object({
+      email: z.string().email("Invalid email address").max(255),
+      password: z.string().min(8, "Password must be at least 8 characters").max(100),
+      username: isLogin ? z.string().optional() : z.string().min(3, "Username must be at least 3 characters").max(50),
+      confirmPassword: isLogin ? z.string().optional() : z.string()
+    });
+
+    try {
+      authSchema.parse(formData);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: validationError.errors[0].message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       if (isLogin) {
+        // Login
         const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
         });
 
@@ -42,24 +71,30 @@ const Login = () => {
 
         toast({
           title: "Welcome back!",
-          description: "You've successfully logged in.",
+          description: "Successfully logged in.",
         });
         navigate("/explore");
       } else {
+        // Sign up
         if (formData.password !== formData.confirmPassword) {
           toast({
             title: "Error",
             description: "Passwords do not match.",
             variant: "destructive",
           });
+          setLoading(false);
           return;
         }
 
         const { error } = await supabase.auth.signUp({
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
           options: {
-            emailRedirectTo: `${window.location.origin}/explore`,
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              display_name: formData.username?.trim(),
+              username: formData.username?.trim(),
+            },
           },
         });
 
@@ -67,18 +102,36 @@ const Login = () => {
 
         toast({
           title: "Account created!",
-          description: "Welcome to Tingle. You're now logged in.",
+          description: "Please check your email to verify your account.",
         });
-        navigate("/explore");
       }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/explore`,
+        },
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -174,30 +227,47 @@ const Login = () => {
             </div>
 
             {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className="pl-10 bg-muted/50 border-border/50 focus:border-primary transition-smooth"
-                    required
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-foreground">Username</Label>
+                  <div className="relative">
+                    <Input
+                      id="username"
+                      name="username"
+                      type="text"
+                      placeholder="Choose a username"
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      className="bg-muted/50 border-border/50 focus:border-primary transition-smooth"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      placeholder="Confirm your password"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className="pl-10 bg-muted/50 border-border/50 focus:border-primary transition-smooth"
+                      required
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <Button
               type="submit"
+              className="w-full gradient-primary hover:opacity-90 transition-smooth neon-glow font-semibold py-6 text-white"
               disabled={loading}
-              className="w-full gradient-primary hover:opacity-90 transition-smooth neon-glow font-semibold py-6"
             >
-              {loading ? "Please wait..." : (isLogin ? "Sign In" : "Create Account")}
+              {loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>
 
@@ -212,8 +282,10 @@ const Login = () => {
             </div>
 
             <Button
+              type="button"
               variant="outline"
-              className="w-full mt-4 bg-muted/50 border-border/50 hover:bg-muted transition-smooth"
+              className="w-full mt-4 bg-card border-border hover:bg-muted transition-smooth"
+              onClick={handleGoogleLogin}
             >
               <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

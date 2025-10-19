@@ -1,143 +1,301 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import { Upload, DollarSign, BarChart } from 'lucide-react';
-import MediaUploadForm from '@/components/MediaUploadForm';
-import CreatorMediaList from '@/components/CreatorMediaList';
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { 
+  TrendingUp, 
+  Upload, 
+  DollarSign, 
+  Wallet,
+  ArrowUpRight,
+  Download
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import Navigation from "@/components/Navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useRoles } from "@/hooks/useRoles";
+import { supabase } from "@/integrations/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { useToast } from "@/hooks/use-toast";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
-export default function CreatorDashboard() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [creator, setCreator] = useState<any>(null);
+const sb = supabase as unknown as SupabaseClient<any>;
+
+interface CreatorStats {
+  total_uploads: number;
+  earnings: number;
+  premium_sales: number;
+  wallet_balance: number;
+  pending_withdrawals: number;
+}
+
+const CreatorDashboard = () => {
+  const { user, loading: authLoading } = useAuth();
+  const { isCreator, isAdmin, loading: rolesLoading } = useRoles();
+  const [stats, setStats] = useState<CreatorStats>({
+    total_uploads: 0,
+    earnings: 0,
+    premium_sales: 0,
+    wallet_balance: 0,
+    pending_withdrawals: 0,
+  });
+  const [salesData, setSalesData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
+    if (user && (isCreator || isAdmin)) {
+      fetchCreatorStats();
+      fetchSalesData();
     }
+  }, [user, isCreator, isAdmin]);
 
-    const fetchCreatorData = async () => {
-      const { data, error } = await supabase
-        .from('creators')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+  const fetchCreatorStats = async () => {
+    try {
+      // Get creator info
+      const { data: creatorData, error: creatorError } = await sb
+        .from("creators")
+        .select("*")
+        .eq("user_id", user?.id)
+        .maybeSingle();
 
-      if (error) {
-        toast.error('Creator profile not found');
-        navigate('/creator-application');
-        return;
-      }
+      if (creatorError) throw creatorError;
 
-      if (data.status !== 'approved') {
-        toast.error('Your creator application is pending approval');
-        navigate('/creator-application');
-        return;
-      }
+      // Get wallet balance
+      const { data: walletData, error: walletError } = await sb
+        .from("user_wallets")
+        .select("balance")
+        .eq("user_id", user?.id)
+        .maybeSingle();
 
-      setCreator(data);
+      if (walletError) throw walletError;
+
+      // Get sales count
+      const { count: salesCount, error: salesError } = await sb
+        .from("purchases")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "completed")
+        .in(
+          "content_id",
+          await sb
+            .from("premium_content")
+            .select("id")
+            .eq("creator_id", user?.id)
+            .then((res: any) => res.data?.map((c: any) => c.id) || [])
+        );
+
+      if (salesError) throw salesError;
+
+      // Get pending withdrawals
+      const { data: withdrawalsData, error: withdrawalsError } = await sb
+        .from("withdrawals")
+        .select("amount")
+        .eq("status", "pending")
+        .in("creator_id", creatorData ? [(creatorData as any).id] : []);
+
+      if (withdrawalsError) throw withdrawalsError;
+
+      const pendingAmount = withdrawalsData?.reduce((sum, w: any) => sum + Number(w.amount), 0) || 0;
+
+      setStats({
+        total_uploads: creatorData ? (creatorData as any).total_uploads || 0 : 0,
+        earnings: creatorData ? Number((creatorData as any).earnings) || 0 : 0,
+        premium_sales: salesCount || 0,
+        wallet_balance: walletData ? Number((walletData as any).balance) || 0 : 0,
+        pending_withdrawals: pendingAmount,
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard statistics.",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    fetchCreatorData();
+  const fetchSalesData = async () => {
+    try {
+    const { data, error } = await sb
+      .from("purchases")
+      .select("created_at, amount")
+      .eq("status", "completed")
+      .order("created_at", { ascending: true })
+      .limit(7);
 
-    // Subscribe to creator changes
-    const channel = supabase
-      .channel('creator-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'creators',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          setCreator(payload.new);
+      if (error) throw error;
+
+      // Group by date
+      const grouped = data?.reduce((acc: any, purchase: any) => {
+        const date = new Date(purchase.created_at).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        if (!acc[date]) {
+          acc[date] = { date, sales: 0 };
         }
-      )
-      .subscribe();
+        acc[date].sales += Number(purchase.amount);
+        return acc;
+      }, {});
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, navigate]);
+      setSalesData(Object.values(grouped || {}));
+    } catch (error) {
+      console.error("Error fetching sales data:", error);
+    }
+  };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (authLoading || rolesLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-20 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        </div>
+      </div>
+    );
   }
 
+  if (!user || (!isCreator && !isAdmin)) {
+    return <Navigate to="/creator" replace />;
+  }
+
+  const statCards = [
+    {
+      title: "Total Uploads",
+      value: stats.total_uploads,
+      icon: Upload,
+      color: "text-blue-500",
+      bgColor: "bg-blue-500/10",
+    },
+    {
+      title: "Total Earnings",
+      value: `$${stats.earnings.toFixed(2)}`,
+      icon: DollarSign,
+      color: "text-green-500",
+      bgColor: "bg-green-500/10",
+    },
+    {
+      title: "Premium Sales",
+      value: stats.premium_sales,
+      icon: TrendingUp,
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
+    },
+    {
+      title: "Wallet Balance",
+      value: `$${stats.wallet_balance.toFixed(2)}`,
+      icon: Wallet,
+      color: "text-orange-500",
+      bgColor: "bg-orange-500/10",
+    },
+  ];
+
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-4xl font-bold">Creator Dashboard</h1>
-          <p className="text-muted-foreground">Manage your content and earnings</p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      
+      <div className="pt-20 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-8 animate-fade-up">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Creator Dashboard</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Track your performance and manage your content
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Balance</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${creator?.pending_balance?.toFixed(2) || '0.00'}</div>
-            </CardContent>
-          </Card>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {statCards.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <Card
+                  key={stat.title}
+                  className="glass-card hover-scale animate-fade-up"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {stat.title}
+                    </CardTitle>
+                    <div className={`${stat.bgColor} p-2 rounded-lg`}>
+                      <Icon className={`w-4 h-4 ${stat.color}`} />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stat.value}</div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
-              <BarChart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${creator?.total_earned?.toFixed(2) || '0.00'}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold capitalize">{creator?.status}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="upload" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upload">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Content
-            </TabsTrigger>
-            <TabsTrigger value="manage">Manage Content</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="upload" className="space-y-4">
-            <Card>
+          {/* Charts and Actions */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Sales Chart */}
+            <Card className="glass-card lg:col-span-2 animate-fade-up" style={{ animationDelay: "0.4s" }}>
               <CardHeader>
-                <CardTitle>Upload New Content</CardTitle>
-                <CardDescription>Share your premium content with your subscribers</CardDescription>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="w-5 h-5" />
+                  <span>Sales Overview</span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <MediaUploadForm creatorId={creator?.id} />
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={salesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="sales"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="manage" className="space-y-4">
-            <CreatorMediaList creatorId={creator?.id} />
-          </TabsContent>
-        </Tabs>
+            {/* Quick Actions */}
+            <Card className="glass-card animate-fade-up" style={{ animationDelay: "0.5s" }}>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button className="w-full gradient-primary">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload New Content
+                </Button>
+                <Button variant="outline" className="w-full">
+                  <Download className="w-4 h-4 mr-2" />
+                  Request Withdrawal
+                </Button>
+                <div className="pt-4 border-t border-border">
+                  <div className="text-sm text-muted-foreground mb-2">
+                    Pending Withdrawals
+                  </div>
+                  <div className="text-2xl font-bold text-primary">
+                    ${stats.pending_withdrawals.toFixed(2)}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default CreatorDashboard;
