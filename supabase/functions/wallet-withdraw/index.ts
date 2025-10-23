@@ -40,7 +40,10 @@ serve(async (req) => {
       throw new Error('INVALID_RECIPIENT');
     }
 
-    console.log('Processing withdrawal for user:', user.id, 'amount:', amount);
+    // Secure logging - avoid exposing user IDs and amounts
+    if (Deno.env.get('DEBUG_MODE') === 'true') {
+      console.log('Processing withdrawal request');
+    }
 
     // Verify user is a creator
     const { data: creator, error: creatorError } = await supabaseClient
@@ -100,7 +103,11 @@ serve(async (req) => {
       );
 
       const transferData = await transferResponse.json();
-      console.log('Paystack transfer response:', transferData);
+      
+      // Secure logging - no sensitive payment data
+      if (Deno.env.get('DEBUG_MODE') === 'true') {
+        console.log('Transfer response received, status:', transferData.status);
+      }
 
       if (!transferData.status) {
         // Update withdrawal request with error

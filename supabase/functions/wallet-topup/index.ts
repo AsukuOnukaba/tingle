@@ -36,7 +36,10 @@ serve(async (req) => {
       throw new Error('INVALID_REFERENCE');
     }
 
-    console.log('Verifying Paystack payment:', reference);
+    // Secure logging - avoid sensitive data exposure
+    if (Deno.env.get('DEBUG_MODE') === 'true') {
+      console.log('Processing payment verification');
+    }
 
     // Verify payment with Paystack
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -50,8 +53,6 @@ serve(async (req) => {
     );
 
     const verifyData = await verifyResponse.json();
-
-    console.log('Paystack verification response:', verifyData);
 
     if (!verifyData.status || verifyData.data.status !== 'success') {
       throw new Error('PAYMENT_VERIFICATION_FAILED');
@@ -75,11 +76,14 @@ serve(async (req) => {
       });
 
     if (creditError) {
-      console.error('Error crediting wallet:', creditError);
+      console.error('Error crediting wallet - code:', creditError.code);
       throw new Error('Failed to credit wallet');
     }
 
-    console.log('Wallet credited successfully:', creditResult);
+    // Secure logging - no sensitive financial data
+    if (Deno.env.get('DEBUG_MODE') === 'true') {
+      console.log('Wallet credit successful');
+    }
 
     return new Response(
       JSON.stringify({

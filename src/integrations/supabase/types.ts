@@ -367,11 +367,74 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          commission: number
+          created_at: string
+          error_message: string | null
+          id: string
+          net_amount: number
+          recipient_code: string
+          reference: string
+          status: string
+          transfer_code: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          commission: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          net_amount: number
+          recipient_code: string
+          reference: string
+          status?: string
+          transfer_code?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          commission?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          net_amount?: number
+          recipient_code?: string
+          reference?: string
+          status?: string
+          transfer_code?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      credit_wallet: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_reference: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      debit_wallet: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_reference: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
