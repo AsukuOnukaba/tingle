@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title TinglePayments
- * @dev Smart contract for Tingle platform payments with escrow protection
+ * @dev Smart contract for handling direct crypto payments with escrow protection
  * 
  * DEPLOYMENT INSTRUCTIONS FOR BASE TESTNET (Remix):
  * 1. Go to https://remix.ethereum.org/
@@ -21,13 +21,20 @@ pragma solidity ^0.8.20;
  * 8. Copy deployed contract address to src/lib/blockchain.ts (line 23)
  * 9. Verify on BaseScan for transparency
  *
+ * PAYMENT FLOW:
+ * - Users send ETH directly to contract via purchaseContent()
+ * - Funds held in escrow for 7 days
+ * - After escrow period, funds automatically split 80/20 (creator/platform)
+ * - Creators can withdraw their earnings anytime
+ * - Buyers can dispute within escrow period for refunds
+ *
  * FEATURES:
- * - Escrow protection (7-day hold period)
- * - Revenue split: 80% creator, 20% platform
- * - Dispute resolution system
- * - Creator earnings withdrawal
- * - Purchase verification on-chain
- * - Reentrancy protection
+ * - Direct ETH payment handling
+ * - Automatic escrow protection (7-day hold)
+ * - 80/20 revenue split (creator/platform)
+ * - Dispute resolution with refunds
+ * - Secure withdrawals with reentrancy protection
+ * - On-chain payment verification
  */
 
 contract TinglePayments {
@@ -134,39 +141,45 @@ contract TinglePayments {
     // ============ Core Functions ============
     
     /**
-     * @dev Record a premium content purchase with escrow
-     * @param buyer Address of the buyer
-     * @param seller Address of the creator/seller
-     * @param amount Total purchase amount in wei
-     * @param contentId Unique identifier for the content
-     * @param transactionRef Unique transaction reference
+     * @dev Purchase premium content by sending ETH directly to contract
+     * @param creator Address of the creator/seller
+     * @param contentId Unique identifier for the content purchased
+     * 
+     * User must send exact ETH amount with transaction.
+     * Funds are held in escrow for ESCROW_PERIOD before release.
      */
-    function recordPurchase(
-        address buyer,
-        address seller,
-        uint256 amount,
-        string memory contentId,
-        string memory transactionRef
-    ) external onlyPlatform {
-        require(buyer != address(0), "Invalid buyer address");
-        require(seller != address(0), "Invalid seller address");
-        require(amount > 0, "Amount must be positive");
+    function purchaseContent(
+        address creator,
+        string memory contentId
+    ) external payable {
+        require(creator != address(0), "Invalid creator address");
+        require(msg.value > 0, "Must send ETH for purchase");
         require(bytes(contentId).length > 0, "Content ID required");
-        require(bytes(transactionRef).length > 0, "Transaction ref required");
-        require(purchasesByRef[transactionRef].buyer == address(0), "Duplicate transaction ref");
+        
+        // Generate unique transaction reference from buyer, creator, contentId, and timestamp
+        string memory transactionRef = string(abi.encodePacked(
+            "TXN-",
+            toHexString(msg.sender),
+            "-",
+            toHexString(creator),
+            "-",
+            uint2str(block.timestamp)
+        ));
+        
+        require(purchasesByRef[transactionRef].buyer == address(0), "Duplicate transaction");
         
         // Calculate revenue split
-        uint256 creatorAmount = (amount * CREATOR_SHARE) / 100;
-        uint256 platformAmount = amount - creatorAmount;
+        uint256 creatorAmount = (msg.value * CREATOR_SHARE) / 100;
+        uint256 platformAmount = msg.value - creatorAmount;
         
         // Calculate release time (7 days from now)
         uint256 releaseTime = block.timestamp + ESCROW_PERIOD;
         
         // Create purchase record
         Purchase memory purchase = Purchase({
-            buyer: buyer,
-            seller: seller,
-            totalAmount: amount,
+            buyer: msg.sender,
+            seller: creator,
+            totalAmount: msg.value,
             creatorAmount: creatorAmount,
             platformAmount: platformAmount,
             contentId: contentId,
@@ -181,9 +194,9 @@ contract TinglePayments {
         allPurchaseRefs.push(transactionRef);
         
         emit PurchaseRecorded(
-            buyer,
-            seller,
-            amount,
+            msg.sender,
+            creator,
+            msg.value,
             creatorAmount,
             platformAmount,
             contentId,
@@ -243,16 +256,23 @@ contract TinglePayments {
      * @dev Platform processes a refund for disputed purchase
      * @param transactionRef The transaction reference to refund
      */
-    function processRefund(string memory transactionRef) external onlyPlatform {
+    function processRefund(string memory transactionRef) external onlyPlatform noReentrant {
         Purchase storage purchase = purchasesByRef[transactionRef];
         
         require(purchase.buyer != address(0), "Purchase not found");
         require(purchase.status == EscrowStatus.Disputed, "Not in disputed status");
         
-        // Update status
+        uint256 refundAmount = purchase.totalAmount;
+        address buyer = purchase.buyer;
+        
+        // Update status first (checks-effects-interactions pattern)
         purchase.status = EscrowStatus.Refunded;
         
-        emit RefundProcessed(transactionRef, purchase.buyer, purchase.totalAmount);
+        // Send refund to buyer
+        (bool success, ) = payable(buyer).call{value: refundAmount}("");
+        require(success, "Refund transfer failed");
+        
+        emit RefundProcessed(transactionRef, buyer, refundAmount);
     }
     
     /**
@@ -364,6 +384,53 @@ contract TinglePayments {
     function updatePlatformWallet(address newWallet) external onlyPlatform {
         require(newWallet != address(0), "Invalid address");
         platformWallet = newWallet;
+    }
+    
+    // ============ Helper Functions ============
+    
+    /**
+     * @dev Convert address to hex string
+     */
+    function toHexString(address addr) internal pure returns (string memory) {
+        bytes memory buffer = new bytes(40);
+        for (uint256 i = 0; i < 20; i++) {
+            bytes1 b = bytes1(uint8(uint256(uint160(addr)) / (2**(8*(19 - i)))));
+            buffer[i*2] = toHexChar(uint8(b) / 16);
+            buffer[i*2+1] = toHexChar(uint8(b) % 16);
+        }
+        return string(buffer);
+    }
+    
+    /**
+     * @dev Convert byte to hex character
+     */
+    function toHexChar(uint8 value) internal pure returns (bytes1) {
+        if (value < 10) {
+            return bytes1(value + 48); // 0-9
+        }
+        return bytes1(value + 87); // a-f
+    }
+    
+    /**
+     * @dev Convert uint to string
+     */
+    function uint2str(uint256 value) internal pure returns (string memory) {
+        if (value == 0) {
+            return "0";
+        }
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
     
     /**

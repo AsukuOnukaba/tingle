@@ -1,8 +1,9 @@
 import { BrowserProvider, Contract, parseEther } from "ethers";
 
-// Enhanced Contract ABI with escrow and revenue split
+// Enhanced Contract ABI for direct payment handling
 const CONTRACT_ABI = [
-  "function recordPurchase(address buyer, address seller, uint256 amount, string contentId, string transactionRef) public",
+  // Purchase function - users send ETH directly
+  "function purchaseContent(address creator, string contentId) public payable",
   "function releaseFunds(string transactionRef) public",
   "function raiseDispute(string transactionRef) public",
   "function processRefund(string transactionRef) public",
@@ -40,13 +41,18 @@ export interface BlockchainPurchase {
   status: EscrowStatus;
 }
 
-export const recordPurchaseOnChain = async (
-  buyerAddress: string,
-  sellerAddress: string,
-  amount: number,
+/**
+ * Purchase content by sending ETH directly to the smart contract
+ * @param creatorAddress - Address of the content creator
+ * @param contentId - Unique identifier for the content
+ * @param amountInETH - Amount to pay in ETH (e.g., "0.01" for 0.01 ETH)
+ * @returns Transaction hash and event data
+ */
+export const purchaseContentOnChain = async (
+  creatorAddress: string,
   contentId: string,
-  transactionRef: string
-): Promise<string> => {
+  amountInETH: string
+): Promise<{ txHash: string; transactionRef: string }> => {
   if (!window.ethereum) {
     throw new Error("MetaMask not installed");
   }
@@ -57,26 +63,48 @@ export const recordPurchaseOnChain = async (
     
     const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
     
-    // Convert amount to wei (assuming amount is in USD/fiat equivalent)
-    const amountInWei = parseEther(amount.toString());
-    
-    // Record purchase with escrow on blockchain
-    const tx = await contract.recordPurchase(
-      buyerAddress,
-      sellerAddress,
-      amountInWei,
+    // Send ETH with the transaction
+    const tx = await contract.purchaseContent(
+      creatorAddress,
       contentId,
-      transactionRef
+      { value: parseEther(amountInETH) }
     );
     
     // Wait for transaction confirmation
-    await tx.wait();
+    const receipt = await tx.wait();
     
-    return tx.hash;
+    // Extract transaction reference from event
+    const purchaseEvent = receipt.logs.find(
+      (log: any) => log.fragment?.name === 'PurchaseRecorded'
+    );
+    
+    const transactionRef = purchaseEvent?.args?.transactionRef || '';
+    
+    return {
+      txHash: receipt.hash,
+      transactionRef
+    };
   } catch (error) {
-    console.error("Blockchain recording error:", error);
+    console.error("Blockchain purchase error:", error);
     throw error;
   }
+};
+
+// Legacy function - kept for backwards compatibility
+// Note: This function no longer matches the smart contract
+// Use purchaseContentOnChain instead
+export const recordPurchaseOnChain = async (
+  buyerAddress: string,
+  sellerAddress: string,
+  amount: number,
+  contentId: string,
+  transactionRef: string
+): Promise<string> => {
+  console.warn("recordPurchaseOnChain is deprecated. Use purchaseContentOnChain instead.");
+  // Convert to ETH and call new function
+  const amountInETH = (amount / 1000).toString(); // Assuming amount is in cents
+  const result = await purchaseContentOnChain(sellerAddress, contentId, amountInETH);
+  return result.txHash;
 };
 
 export const releaseFundsFromEscrow = async (
