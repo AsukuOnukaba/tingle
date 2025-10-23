@@ -243,7 +243,7 @@ Set up monitoring for:
 ### Transaction Fails
 - Check ETH amount is sufficient
 - Verify contract address is correct
-- Ensure MetaMask is on Base network
+- Ensure OKX Wallet is on Base network
 - Check gas limit is adequate
 
 ### Withdrawal Fails

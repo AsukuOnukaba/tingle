@@ -7,7 +7,7 @@ This guide provides step-by-step instructions for testing all security features 
 ## Prerequisites
 
 - Contract deployed on Base Sepolia testnet
-- MetaMask with test ETH
+- OKX Wallet with test ETH
 - At least 2 test accounts (buyer and creator)
 - Access to BaseScan for transaction verification
 

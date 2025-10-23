@@ -18,12 +18,12 @@ declare global {
   }
 }
 
-interface MetaMaskConnectProps {
+interface WalletConnectProps {
   currentWalletAddress?: string;
   onConnect?: (address: string | null) => void;
 }
 
-export const MetaMaskConnect = ({ currentWalletAddress, onConnect }: MetaMaskConnectProps) => {
+export const WalletConnect = ({ currentWalletAddress, onConnect }: WalletConnectProps) => {
   const [walletAddress, setWalletAddress] = useState<string | null>(currentWalletAddress || null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -37,8 +37,8 @@ export const MetaMaskConnect = ({ currentWalletAddress, onConnect }: MetaMaskCon
   const connectWallet = async () => {
     if (typeof window.ethereum === 'undefined') {
       toast({
-        title: "MetaMask Not Found",
-        description: "Please install MetaMask extension to connect your wallet",
+        title: "Wallet Not Found",
+        description: "Please install OKX Wallet extension to connect your wallet",
         variant: "destructive",
       });
       return;
@@ -149,7 +149,7 @@ export const MetaMaskConnect = ({ currentWalletAddress, onConnect }: MetaMaskCon
           className="w-full"
         >
           <Wallet className="mr-2 h-4 w-4" />
-          Connect MetaMask
+          Connect OKX Wallet
         </Button>
       )}
     </div>

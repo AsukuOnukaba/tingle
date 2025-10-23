@@ -62,7 +62,7 @@ export const purchaseContentOnChain = async (
   amountInETH: string
 ): Promise<{ txHash: string; transactionRef: string }> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -119,7 +119,7 @@ export const releaseFundsFromEscrow = async (
   transactionRef: string
 ): Promise<string> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -142,7 +142,7 @@ export const raiseDispute = async (
   transactionRef: string
 ): Promise<string> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -163,7 +163,7 @@ export const raiseDispute = async (
 
 export const withdrawCreatorEarnings = async (): Promise<string> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -186,7 +186,7 @@ export const getCreatorWithdrawableBalance = async (
   creatorAddress: string
 ): Promise<bigint> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -205,7 +205,7 @@ export const getCreatorTotalEarnings = async (
   creatorAddress: string
 ): Promise<bigint> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -224,7 +224,7 @@ export const getPurchaseFromChain = async (
   contentId: string
 ): Promise<BlockchainPurchase | null> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -258,7 +258,7 @@ export const getPurchaseByRef = async (
   transactionRef: string
 ): Promise<BlockchainPurchase | null> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -299,7 +299,7 @@ export const checkIfAlreadyPurchased = async (
   contentId: string
 ): Promise<boolean> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {
@@ -341,7 +341,7 @@ export const isContractPaused = async (): Promise<boolean> => {
  */
 export const getTotalEscrowHeld = async (): Promise<bigint> => {
   if (!window.ethereum) {
-    throw new Error("MetaMask not installed");
+    throw new Error("Crypto wallet not installed");
   }
 
   try {

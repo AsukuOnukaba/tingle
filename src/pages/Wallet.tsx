@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import Navigation from "@/components/Navigation";
 import { TopUpModal } from "@/components/TopUpModal";
 import { WithdrawModal } from "@/components/WithdrawModal";
-import { MetaMaskConnect } from "@/components/MetaMaskConnect";
+import { WalletConnect } from "@/components/WalletConnect";
 import { EscrowManager } from "@/components/EscrowManager";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
@@ -189,12 +189,12 @@ const Wallet = () => {
                   <CardTitle>Blockchain Wallet</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <MetaMaskConnect 
+                  <WalletConnect 
                     currentWalletAddress={creatorWalletAddress || undefined}
                     onConnect={(address) => setCreatorWalletAddress(address)}
                   />
                   <p className="text-xs text-muted-foreground mt-3">
-                    Connect MetaMask for blockchain transaction transparency
+                    Connect your crypto wallet for blockchain transaction transparency
                   </p>
                 </CardContent>
               </Card>
