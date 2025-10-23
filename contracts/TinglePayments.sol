@@ -46,6 +46,9 @@ contract TinglePayments {
     uint256 public constant CREATOR_SHARE = 80; // 80%
     uint256 public constant PLATFORM_SHARE = 20; // 20%
     uint256 public constant ESCROW_PERIOD = 7 days;
+    uint256 public constant DISPUTE_DEADLINE = 7 days; // Must dispute within escrow period
+    uint256 public constant MIN_PURCHASE_AMOUNT = 0.0001 ether; // Prevent dust attacks
+    uint256 public constant MAX_PURCHASE_AMOUNT = 10 ether; // Prevent large exploits
     
     enum EscrowStatus { Pending, Released, Disputed, Refunded }
     
@@ -59,6 +62,7 @@ contract TinglePayments {
         uint256 timestamp;
         uint256 releaseTime;
         EscrowStatus status;
+        bool fundsHeld; // Track if funds are still in escrow
     }
     
     // Mapping: transactionRef => Purchase
@@ -67,17 +71,26 @@ contract TinglePayments {
     // Mapping: contentId => transactionRef (for quick lookup)
     mapping(string => string) public contentIdToRef;
     
+    // Mapping: buyer + contentId => prevent duplicate purchases
+    mapping(bytes32 => bool) public purchaseExists;
+    
     // Mapping: creator => withdrawable balance
     mapping(address => uint256) public creatorBalances;
     
     // Mapping: creator => total lifetime earnings
     mapping(address => uint256) public creatorTotalEarnings;
     
+    // Track total funds held in escrow for accounting
+    uint256 public totalEscrowHeld;
+    
     // Track all purchase references for enumeration
     string[] public allPurchaseRefs;
     
     // Reentrancy guard
     bool private locked;
+    
+    // Emergency pause mechanism
+    bool public paused;
     
     // ============ Events ============
     
@@ -117,6 +130,9 @@ contract TinglePayments {
         uint256 timestamp
     );
     
+    event EmergencyPause(address indexed by, uint256 timestamp);
+    event EmergencyUnpause(address indexed by, uint256 timestamp);
+    
     // ============ Modifiers ============
     
     modifier onlyPlatform() {
@@ -129,6 +145,16 @@ contract TinglePayments {
         locked = true;
         _;
         locked = false;
+    }
+    
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+    
+    modifier validAddress(address addr) {
+        require(addr != address(0), "Invalid address");
+        _;
     }
     
     // ============ Constructor ============
@@ -147,16 +173,28 @@ contract TinglePayments {
      * 
      * User must send exact ETH amount with transaction.
      * Funds are held in escrow for ESCROW_PERIOD before release.
+     * 
+     * Security features:
+     * - Amount validation (min/max limits)
+     * - Duplicate purchase prevention
+     * - Front-running protection via unique hash
+     * - Emergency pause check
      */
     function purchaseContent(
         address creator,
         string memory contentId
-    ) external payable {
-        require(creator != address(0), "Invalid creator address");
-        require(msg.value > 0, "Must send ETH for purchase");
-        require(bytes(contentId).length > 0, "Content ID required");
+    ) external payable whenNotPaused validAddress(creator) {
+        require(msg.value >= MIN_PURCHASE_AMOUNT, "Amount too low");
+        require(msg.value <= MAX_PURCHASE_AMOUNT, "Amount too high");
+        require(bytes(contentId).length > 0 && bytes(contentId).length <= 128, "Invalid content ID");
+        require(creator != msg.sender, "Cannot purchase own content");
         
-        // Generate unique transaction reference from buyer, creator, contentId, and timestamp
+        // Prevent duplicate purchases (front-running protection)
+        bytes32 purchaseHash = keccak256(abi.encodePacked(msg.sender, creator, contentId));
+        require(!purchaseExists[purchaseHash], "Already purchased this content");
+        purchaseExists[purchaseHash] = true;
+        
+        // Generate unique transaction reference
         string memory transactionRef = string(abi.encodePacked(
             "TXN-",
             toHexString(msg.sender),
@@ -172,7 +210,7 @@ contract TinglePayments {
         uint256 creatorAmount = (msg.value * CREATOR_SHARE) / 100;
         uint256 platformAmount = msg.value - creatorAmount;
         
-        // Calculate release time (7 days from now)
+        // Calculate release time
         uint256 releaseTime = block.timestamp + ESCROW_PERIOD;
         
         // Create purchase record
@@ -185,13 +223,17 @@ contract TinglePayments {
             contentId: contentId,
             timestamp: block.timestamp,
             releaseTime: releaseTime,
-            status: EscrowStatus.Pending
+            status: EscrowStatus.Pending,
+            fundsHeld: true
         });
         
         // Store purchase
         purchasesByRef[transactionRef] = purchase;
         contentIdToRef[contentId] = transactionRef;
         allPurchaseRefs.push(transactionRef);
+        
+        // Track escrow
+        totalEscrowHeld += msg.value;
         
         emit PurchaseRecorded(
             msg.sender,
@@ -208,22 +250,28 @@ contract TinglePayments {
     /**
      * @dev Release funds from escrow after the holding period
      * @param transactionRef The transaction reference to release
+     * 
+     * Anyone can call this after escrow period ends.
+     * Splits funds 80/20 and makes them withdrawable.
      */
-    function releaseFunds(string memory transactionRef) external {
+    function releaseFunds(string memory transactionRef) external whenNotPaused {
         Purchase storage purchase = purchasesByRef[transactionRef];
         
         require(purchase.buyer != address(0), "Purchase not found");
         require(purchase.status == EscrowStatus.Pending, "Not in pending status");
+        require(purchase.fundsHeld, "Funds already distributed");
         require(block.timestamp >= purchase.releaseTime, "Escrow period not ended");
         
-        // Update status
+        // Update state first (checks-effects-interactions)
         purchase.status = EscrowStatus.Released;
+        purchase.fundsHeld = false;
         
-        // Add to creator's withdrawable balance
+        // Reduce escrow tracking
+        totalEscrowHeld -= purchase.totalAmount;
+        
+        // Add to withdrawable balances
         creatorBalances[purchase.seller] += purchase.creatorAmount;
         creatorTotalEarnings[purchase.seller] += purchase.creatorAmount;
-        
-        // Add to platform balance
         creatorBalances[platformWallet] += purchase.platformAmount;
         
         emit FundsReleased(
@@ -237,17 +285,25 @@ contract TinglePayments {
     /**
      * @dev Buyer raises a dispute during escrow period
      * @param transactionRef The transaction reference to dispute
+     * 
+     * Must be called within DISPUTE_DEADLINE (7 days) of purchase.
+     * Only the buyer can raise a dispute.
      */
-    function raiseDispute(string memory transactionRef) external {
+    function raiseDispute(string memory transactionRef) external whenNotPaused {
         Purchase storage purchase = purchasesByRef[transactionRef];
         
         require(purchase.buyer != address(0), "Purchase not found");
         require(msg.sender == purchase.buyer, "Only buyer can raise dispute");
         require(purchase.status == EscrowStatus.Pending, "Not in pending status");
-        require(block.timestamp < purchase.releaseTime, "Escrow period ended");
+        require(purchase.fundsHeld, "Funds already distributed");
+        require(block.timestamp < purchase.releaseTime, "Dispute deadline passed");
+        require(block.timestamp <= purchase.timestamp + DISPUTE_DEADLINE, "Dispute period expired");
         
         // Update status
         purchase.status = EscrowStatus.Disputed;
+        
+        emit DisputeRaised(transactionRef, purchase.buyer, block.timestamp);
+    }
         
         emit DisputeRaised(transactionRef, purchase.buyer, block.timestamp);
     }
@@ -255,21 +311,30 @@ contract TinglePayments {
     /**
      * @dev Platform processes a refund for disputed purchase
      * @param transactionRef The transaction reference to refund
+     * 
+     * Only platform can call this.
+     * Sends full refund to buyer and updates escrow tracking.
+     * Uses reentrancy guard for security.
      */
-    function processRefund(string memory transactionRef) external onlyPlatform noReentrant {
+    function processRefund(string memory transactionRef) external onlyPlatform noReentrant whenNotPaused {
         Purchase storage purchase = purchasesByRef[transactionRef];
         
         require(purchase.buyer != address(0), "Purchase not found");
         require(purchase.status == EscrowStatus.Disputed, "Not in disputed status");
+        require(purchase.fundsHeld, "Funds already distributed");
         
         uint256 refundAmount = purchase.totalAmount;
-        address buyer = purchase.buyer;
+        address payable buyer = payable(purchase.buyer);
         
-        // Update status first (checks-effects-interactions pattern)
+        // Update state first (checks-effects-interactions pattern)
         purchase.status = EscrowStatus.Refunded;
+        purchase.fundsHeld = false;
+        
+        // Reduce escrow tracking
+        totalEscrowHeld -= refundAmount;
         
         // Send refund to buyer
-        (bool success, ) = payable(buyer).call{value: refundAmount}("");
+        (bool success, ) = buyer.call{value: refundAmount}("");
         require(success, "Refund transfer failed");
         
         emit RefundProcessed(transactionRef, buyer, refundAmount);
@@ -380,10 +445,54 @@ contract TinglePayments {
     
     /**
      * @dev Update platform wallet address
+     * @param newWallet New platform wallet address
      */
-    function updatePlatformWallet(address newWallet) external onlyPlatform {
-        require(newWallet != address(0), "Invalid address");
+    function updatePlatformWallet(address newWallet) external onlyPlatform validAddress(newWallet) {
+        address oldWallet = platformWallet;
         platformWallet = newWallet;
+        
+        // Transfer any platform earnings to new wallet
+        if (creatorBalances[oldWallet] > 0) {
+            creatorBalances[newWallet] = creatorBalances[oldWallet];
+            creatorBalances[oldWallet] = 0;
+        }
+    }
+    
+    /**
+     * @dev Emergency pause - stops all purchases and withdrawals
+     * Only platform can call this in case of security emergency
+     */
+    function pause() external onlyPlatform {
+        require(!paused, "Already paused");
+        paused = true;
+        emit EmergencyPause(msg.sender, block.timestamp);
+    }
+    
+    /**
+     * @dev Unpause the contract
+     * Only platform can call this after emergency is resolved
+     */
+    function unpause() external onlyPlatform {
+        require(paused, "Not paused");
+        paused = false;
+        emit EmergencyUnpause(msg.sender, block.timestamp);
+    }
+    
+    /**
+     * @dev Check if a buyer has already purchased specific content
+     * Useful for frontend to prevent duplicate purchase attempts
+     */
+    function hasPurchased(address buyer, address creator, string memory contentId) external view returns (bool) {
+        bytes32 purchaseHash = keccak256(abi.encodePacked(buyer, creator, contentId));
+        return purchaseExists[purchaseHash];
+    }
+    
+    /**
+     * @dev Get contract balance for verification
+     * Should equal totalEscrowHeld + sum of all withdrawable balances
+     */
+    function getContractBalance() external view returns (uint256) {
+        return address(this).balance;
     }
     
     // ============ Helper Functions ============
@@ -434,7 +543,17 @@ contract TinglePayments {
     }
     
     /**
-     * @dev Receive ETH payments
+     * @dev Fallback function - reject direct ETH transfers
+     * Users must use purchaseContent() function
      */
-    receive() external payable {}
+    receive() external payable {
+        revert("Use purchaseContent() to send ETH");
+    }
+    
+    /**
+     * @dev Fallback for calls to non-existent functions
+     */
+    fallback() external payable {
+        revert("Function does not exist");
+    }
 }

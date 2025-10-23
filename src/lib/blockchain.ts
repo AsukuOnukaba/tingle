@@ -1,8 +1,8 @@
 import { BrowserProvider, Contract, parseEther } from "ethers";
 
-// Enhanced Contract ABI for direct payment handling
+// Enhanced Contract ABI for direct payment handling with security features
 const CONTRACT_ABI = [
-  // Purchase function - users send ETH directly
+  // Purchase function - users send ETH directly with validation
   "function purchaseContent(address creator, string contentId) public payable",
   "function releaseFunds(string transactionRef) public",
   "function raiseDispute(string transactionRef) public",
@@ -10,13 +10,21 @@ const CONTRACT_ABI = [
   "function withdrawEarnings() public",
   "function getWithdrawableBalance(address creator) public view returns (uint256)",
   "function getTotalEarnings(address creator) public view returns (uint256)",
+  "function hasPurchased(address buyer, address creator, string contentId) public view returns (bool)",
   "function getPurchaseByRef(string transactionRef) public view returns (address buyer, address seller, uint256 totalAmount, uint256 creatorAmount, uint256 platformAmount, string contentId, uint256 timestamp, uint256 releaseTime, uint8 status)",
   "function getPurchaseByContentId(string contentId) public view returns (address buyer, address seller, uint256 totalAmount, uint256 creatorAmount, uint256 platformAmount, uint256 timestamp, uint8 status)",
+  "function pause() public",
+  "function unpause() public",
+  "function paused() public view returns (bool)",
+  "function totalEscrowHeld() public view returns (uint256)",
+  "function getContractBalance() public view returns (uint256)",
   "event PurchaseRecorded(address indexed buyer, address indexed seller, uint256 totalAmount, uint256 creatorAmount, uint256 platformAmount, string contentId, string transactionRef, uint256 timestamp)",
   "event FundsReleased(string indexed transactionRef, address indexed creator, uint256 creatorAmount, uint256 platformAmount)",
   "event DisputeRaised(string indexed transactionRef, address indexed buyer, uint256 timestamp)",
   "event RefundProcessed(string indexed transactionRef, address indexed buyer, uint256 amount)",
-  "event CreatorWithdrawal(address indexed creator, uint256 amount, uint256 timestamp)"
+  "event CreatorWithdrawal(address indexed creator, uint256 amount, uint256 timestamp)",
+  "event EmergencyPause(address indexed by, uint256 timestamp)",
+  "event EmergencyUnpause(address indexed by, uint256 timestamp)"
 ];
 
 // Replace with your deployed contract address
@@ -278,5 +286,72 @@ export const getPurchaseByRef = async (
   } catch (error) {
     console.error("Error fetching purchase by ref from chain:", error);
     return null;
+  }
+};
+
+/**
+ * Check if a user has already purchased specific content
+ * Useful before initiating purchase to provide better UX
+ */
+export const checkIfAlreadyPurchased = async (
+  buyerAddress: string,
+  creatorAddress: string,
+  contentId: string
+): Promise<boolean> => {
+  if (!window.ethereum) {
+    throw new Error("MetaMask not installed");
+  }
+
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+    const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+    
+    const hasPurchased = await contract.hasPurchased(buyerAddress, creatorAddress, contentId);
+    return hasPurchased;
+  } catch (error) {
+    console.error("Error checking purchase status:", error);
+    return false;
+  }
+};
+
+/**
+ * Check if contract is paused
+ * Useful for showing maintenance messages to users
+ */
+export const isContractPaused = async (): Promise<boolean> => {
+  if (!window.ethereum) {
+    return false;
+  }
+
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+    const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+    
+    const paused = await contract.paused();
+    return paused;
+  } catch (error) {
+    console.error("Error checking pause status:", error);
+    return false;
+  }
+};
+
+/**
+ * Get total funds held in escrow across all purchases
+ * Useful for platform monitoring and verification
+ */
+export const getTotalEscrowHeld = async (): Promise<bigint> => {
+  if (!window.ethereum) {
+    throw new Error("MetaMask not installed");
+  }
+
+  try {
+    const provider = new BrowserProvider(window.ethereum);
+    const contract = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+    
+    const escrowHeld = await contract.totalEscrowHeld();
+    return escrowHeld;
+  } catch (error) {
+    console.error("Error fetching escrow total:", error);
+    return BigInt(0);
   }
 };
