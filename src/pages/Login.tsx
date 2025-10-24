@@ -124,14 +124,11 @@ const Login = () => {
           description: roles.includes('admin') ? "Welcome back, Admin!" : "Welcome back!",
         });
         
-        // Use setTimeout to avoid race conditions with useEffect
-        setTimeout(() => {
-          if (roles.includes('admin')) {
-            navigate("/admin", { replace: true });
-          } else {
-            navigate("/home", { replace: true });
-          }
-        }, 100);
+        if (roles.includes('admin')) {
+          navigate("/admin", { replace: true });
+        } else {
+          navigate("/home", { replace: true });
+        }
       } else {
         // Sign up flow
         passwordSchema.parse(formData.password);

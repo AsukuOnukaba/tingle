@@ -145,6 +145,7 @@ const AdminPanel = () => {
     }
   };
 
+  // Wait for both auth and roles to load
   if (authLoading || rolesLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -156,8 +157,13 @@ const AdminPanel = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  // Only redirect if we're sure they're not admin (after loading is done)
+  if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/home" replace />;
   }
 
   const statCards = [
