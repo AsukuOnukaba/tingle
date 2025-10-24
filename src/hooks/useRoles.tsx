@@ -13,7 +13,10 @@ export const useRoles = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchUserRoles = useCallback(async () => {
+    console.log('🔄 useRoles: Fetching roles for user:', user?.id);
+    
     if (!user?.id) {
+      console.log('⚠️ useRoles: No user ID, setting defaults');
       setRoles([]);
       setIsAdmin(false);
       setIsCreator(false);
@@ -31,11 +34,12 @@ export const useRoles = () => {
       if (error) throw error;
 
       const userRoles = data?.map((r: any) => r.role) || [];
+      console.log('✅ useRoles: Fetched roles:', userRoles, 'isAdmin:', userRoles.includes('admin'));
       setRoles(userRoles);
       setIsAdmin(userRoles.includes('admin'));
       setIsCreator(userRoles.includes('creator'));
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      console.error('❌ useRoles: Error fetching roles:', error);
       setRoles([]);
       setIsAdmin(false);
       setIsCreator(false);

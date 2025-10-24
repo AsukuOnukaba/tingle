@@ -60,6 +60,15 @@ const AdminPanel = () => {
   });
   const { toast } = useToast();
 
+  // Debug logging
+  console.log('🔍 AdminPanel State:', {
+    authLoading,
+    rolesLoading,
+    hasUser: !!user,
+    userId: user?.id,
+    isAdmin,
+  });
+
   useEffect(() => {
     if (user && isAdmin) {
       fetchAdminData();
@@ -145,7 +154,7 @@ const AdminPanel = () => {
     }
   };
 
-  // Wait for both auth and roles to load completely
+  // Show loading spinner while auth or roles are being fetched
   if (authLoading || rolesLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -157,13 +166,13 @@ const AdminPanel = () => {
     );
   }
 
-  // After loading completes, check authentication and roles
+  // Redirect to login if not authenticated
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Only redirect if loading is definitely complete and user is confirmed not admin
-  if (!authLoading && !rolesLoading && !isAdmin) {
+  // Redirect to home if not an admin (only after loading completes)
+  if (!isAdmin) {
     return <Navigate to="/home" replace />;
   }
 
