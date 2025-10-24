@@ -27,7 +27,7 @@ interface Plan {
 const ManagePlans = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isCreator } = useRoles();
+  const { isCreator, isAdmin } = useRoles();
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,12 +46,13 @@ const ManagePlans = () => {
       navigate("/login");
       return;
     }
-    if (!isCreator) {
+    // Allow both creators and admins to access
+    if (!isCreator && !isAdmin) {
       navigate("/home");
       return;
     }
     fetchPlans();
-  }, [user, isCreator]);
+  }, [user, isCreator, isAdmin]);
 
   const fetchPlans = async () => {
     try {
@@ -62,9 +63,13 @@ const ManagePlans = () => {
         .from("creators")
         .select("id")
         .eq("user_id", user?.id)
-        .single();
+        .maybeSingle();
 
-      if (!creatorData) return;
+      if (!creatorData) {
+        setPlans([]);
+        setLoading(false);
+        return;
+      }
 
       // Fetch plans
       const { data: plansData, error } = await (supabase as any)
@@ -229,7 +234,7 @@ const ManagePlans = () => {
     }
   };
 
-  if (!user || !isCreator) return null;
+  if (!user || (!isCreator && !isAdmin)) return null;
 
   return (
     <div className="min-h-screen bg-background">
