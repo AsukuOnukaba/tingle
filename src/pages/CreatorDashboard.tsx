@@ -70,7 +70,7 @@ const CreatorDashboard = () => {
 
       // Get wallet balance
       const { data: walletData, error: walletError } = await sb
-        .from("user_wallets")
+        .from("wallets")
         .select("balance")
         .eq("user_id", user?.id)
         .maybeSingle();
@@ -79,15 +79,14 @@ const CreatorDashboard = () => {
 
       // Get sales count
       const { count: salesCount, error: salesError } = await sb
-        .from("purchases")
+        .from("media_purchases")
         .select("*", { count: "exact", head: true })
-        .eq("status", "completed")
         .in(
-          "content_id",
+          "media_id",
           await sb
-            .from("premium_content")
+            .from("media")
             .select("id")
-            .eq("creator_id", user?.id)
+            .eq("creator_id", creatorData?.id || '')
             .then((res: any) => res.data?.map((c: any) => c.id) || [])
         );
 
@@ -95,10 +94,10 @@ const CreatorDashboard = () => {
 
       // Get pending withdrawals
       const { data: withdrawalsData, error: withdrawalsError } = await sb
-        .from("withdrawals")
+        .from("withdrawal_requests")
         .select("amount")
         .eq("status", "pending")
-        .in("creator_id", creatorData ? [(creatorData as any).id] : []);
+        .eq("user_id", user?.id);
 
       if (withdrawalsError) throw withdrawalsError;
 
@@ -126,9 +125,8 @@ const CreatorDashboard = () => {
   const fetchSalesData = async () => {
     try {
     const { data, error } = await sb
-      .from("purchases")
-      .select("created_at, amount")
-      .eq("status", "completed")
+      .from("media_purchases")
+      .select("created_at, price_paid")
       .order("created_at", { ascending: true })
       .limit(7);
 
@@ -143,7 +141,7 @@ const CreatorDashboard = () => {
         if (!acc[date]) {
           acc[date] = { date, sales: 0 };
         }
-        acc[date].sales += Number(purchase.amount);
+        acc[date].sales += Number(purchase.price_paid);
         return acc;
       }, {});
 

@@ -79,7 +79,7 @@ const AdminPanel = () => {
 
       // Fetch transactions
       const { data: transactionsData, error: transactionsError } = await sb
-        .from("purchases")
+        .from("transactions")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50);
@@ -89,7 +89,7 @@ const AdminPanel = () => {
 
       // Calculate stats
       const { count: usersCount } = await sb
-        .from("user_wallets")
+        .from("wallets")
         .select("*", { count: "exact", head: true });
 
       setStats({
@@ -157,7 +157,7 @@ const AdminPanel = () => {
   }
 
   if (!user || !isAdmin) {
-    return <Navigate to="/home" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   const statCards = [

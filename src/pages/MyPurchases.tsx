@@ -40,30 +40,36 @@ const MyPurchases = () => {
   const fetchPurchases = async () => {
     try {
     const { data, error } = await sb
-      .from("purchases")
+      .from("media_purchases")
       .select(`
         id,
-        amount,
+        price_paid,
         created_at,
-        premium_content (
+        media_id,
+        media (
           id,
           title,
           description,
-          type,
-          url,
+          file_url,
           thumbnail_url
         )
       `)
-      .eq("status", "completed")
       .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       const normalized: Purchase[] = (data || []).map((p: any) => ({
         id: p.id,
-        amount: Number(p.amount),
+        amount: Number(p.price_paid),
         created_at: p.created_at,
-        premium_content: Array.isArray(p.premium_content) ? p.premium_content[0] : p.premium_content,
+        premium_content: {
+          id: p.media?.id || p.media_id,
+          title: p.media?.title || 'Unknown',
+          description: p.media?.description || '',
+          type: 'media',
+          url: p.media?.file_url || '',
+          thumbnail_url: p.media?.thumbnail_url || ''
+        },
       }));
 
       setPurchases(normalized);
