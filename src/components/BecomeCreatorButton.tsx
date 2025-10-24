@@ -42,11 +42,20 @@ export const BecomeCreatorButton = () => {
         return;
       }
 
+      // Get user profile for email notification
+      const { data: profile } = await (supabase as any)
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .single();
+
+      // Insert into creators table with pending status and application note
       const { error } = await (supabase as any)
-        .from("creator_applications")
+        .from("creators")
         .insert({
           user_id: user.id,
-          reason: reason.trim(),
+          display_name: profile?.display_name || "Unknown",
+          application_note: reason.trim(),
           status: "pending",
         });
 
@@ -61,9 +70,24 @@ export const BecomeCreatorButton = () => {
           throw error;
         }
       } else {
+        // Send email notification to admin
+        try {
+          await supabase.functions.invoke('notify-creator-application', {
+            body: {
+              user_id: user.id,
+              creator_name: profile?.display_name || "Unknown",
+              creator_email: user.email,
+              reason: reason.trim()
+            }
+          });
+        } catch (emailError) {
+          console.error('Failed to send email notification:', emailError);
+          // Don't fail the whole process if email fails
+        }
+
         toast({
           title: "Application submitted!",
-          description: "We'll review your application soon",
+          description: "We'll review your application soon and notify you via email",
         });
         setOpen(false);
         navigate("/creator-pending");

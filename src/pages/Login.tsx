@@ -1,18 +1,22 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Heart, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Heart, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
+const emailSchema = z.string().email("Invalid email address");
+const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -23,30 +27,138 @@ const Login = () => {
   });
 
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
+    // Check if user is already logged in and redirect admins accordingly
+    const checkUserAndRedirect = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/explore");
+        const { data: rolesData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id);
+        
+        const roles = rolesData?.map(r => r.role) || [];
+        if (roles.includes('admin')) {
+          navigate("/admin");
+        } else {
+          navigate("/home");
+        }
       }
     };
-    checkUser();
+    checkUserAndRedirect();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Validate inputs
-    const authSchema = z.object({
-      email: z.string().email("Invalid email address").max(255),
-      password: z.string().min(8, "Password must be at least 8 characters").max(100),
-      username: isLogin ? z.string().optional() : z.string().min(3, "Username must be at least 3 characters").max(50),
-      confirmPassword: isLogin ? z.string().optional() : z.string()
-    });
-
     try {
-      authSchema.parse(formData);
+      emailSchema.parse(formData.email);
+
+      if (isResetMode) {
+        // Password reset flow
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/login?reset=true`,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Password reset email sent",
+          description: "Check your email for the password reset link",
+        });
+        
+        setIsResetMode(false);
+        setFormData({ email: "", password: "", confirmPassword: "", username: "" });
+      } else if (isLogin) {
+        // Login flow
+        passwordSchema.parse(formData.password);
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (error) throw error;
+
+        // Check if user is admin and redirect accordingly
+        const { data: rolesData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', data.user.id);
+
+        const roles = rolesData?.map(r => r.role) || [];
+        
+        toast({
+          title: "Login successful",
+          description: roles.includes('admin') ? "Welcome back, Admin!" : "Welcome back!",
+        });
+        
+        if (roles.includes('admin')) {
+          navigate("/admin");
+        } else {
+          navigate("/home");
+        }
+      } else {
+        // Sign up flow
+        passwordSchema.parse(formData.password);
+
+        if (formData.password !== formData.confirmPassword) {
+          throw new Error("Passwords do not match");
+        }
+
+        if (!formData.username.trim()) {
+          throw new Error("Username is required");
+        }
+
+        const redirectUrl = `${window.location.origin}/`;
+
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              username: formData.username,
+            },
+          },
+        });
+
+        if (error) throw error;
+
+        // Create profile
+        if (data.user) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              display_name: formData.username,
+              age: 18,
+            });
+
+          if (profileError) {
+            console.error("Profile creation error:", profileError);
+          }
+        }
+
+        toast({
+          title: "Account created successfully",
+          description: "You can now log in with your credentials",
+        });
+
+        setIsLogin(true);
+        setFormData({ ...formData, password: "", confirmPassword: "" });
+      }
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
     } catch (validationError) {
       if (validationError instanceof z.ZodError) {
         toast({

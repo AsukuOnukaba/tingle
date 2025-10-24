@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Explore from "./pages/Explore";
 import Profile from "./pages/Profile";
 import Chat from "./pages/Chat";
+import ChatList from "./pages/ChatList";
 import Creator from "./pages/Creator";
 import CreatorPending from "./pages/CreatorPending";
 import About from "./pages/About";
@@ -40,7 +41,7 @@ const App = () => (
           <Route path="/explore" element={<Explore />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile/:id" element={<Profile />} />
-          <Route path="/chat" element={<Chat />} />
+          <Route path="/chat" element={<ChatList />} />
           <Route path="/chat/:recipientId" element={<Chat />} />
           <Route path="/creator" element={<Creator />} />
           <Route path="/creator/pending" element={<CreatorPending />} />
@@ -54,7 +55,6 @@ const App = () => (
           <Route path="/creator-dashboard" element={<CreatorDashboard />} />
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/admin" element={<AdminPanel />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
