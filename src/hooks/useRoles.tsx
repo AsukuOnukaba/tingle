@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -12,47 +12,41 @@ export const useRoles = () => {
   const [isCreator, setIsCreator] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchUserRoles();
-    } else {
+  const fetchUserRoles = useCallback(async () => {
+    if (!user?.id) {
       setRoles([]);
       setIsAdmin(false);
       setIsCreator(false);
       setLoading(false);
+      return;
     }
-  }, [user]);
 
-  const fetchUserRoles = async () => {
-    setLoading(true); // Ensure loading is true while fetching
+    setLoading(true);
     try {
-      console.log('🔍 Fetching roles for user:', user?.id);
       const { data, error } = await sb
         .from('user_roles')
         .select('role')
-        .eq('user_id', user?.id);
-
-      console.log('✅ Roles data:', data);
-      console.log('❌ Roles error:', error);
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
       const userRoles = data?.map((r: any) => r.role) || [];
-      console.log('👤 User roles:', userRoles);
       setRoles(userRoles);
       setIsAdmin(userRoles.includes('admin'));
       setIsCreator(userRoles.includes('creator'));
-      console.log('🔐 Is Admin:', userRoles.includes('admin'));
     } catch (error) {
       console.error('Error fetching roles:', error);
-      // On error, set safe defaults
       setRoles([]);
       setIsAdmin(false);
       setIsCreator(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchUserRoles();
+  }, [fetchUserRoles]);
 
   return { roles, isAdmin, isCreator, loading };
 };
