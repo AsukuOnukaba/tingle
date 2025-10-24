@@ -16,11 +16,11 @@ export const useRoles = () => {
     console.log('🔄 useRoles: Fetching roles for user:', user?.id);
     
     if (!user?.id) {
-      console.log('⚠️ useRoles: No user ID, setting defaults');
+      console.log('⚠️ useRoles: No user ID yet, waiting...');
+      // Don't set loading to false - wait for auth to complete
       setRoles([]);
       setIsAdmin(false);
       setIsCreator(false);
-      setLoading(false);
       return;
     }
 
