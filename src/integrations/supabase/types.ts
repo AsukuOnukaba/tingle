@@ -266,6 +266,7 @@ export type Database = {
       profiles: {
         Row: {
           age: number
+          basename: string | null
           bio: string | null
           created_at: string | null
           display_name: string
@@ -277,9 +278,11 @@ export type Database = {
           profile_image: string | null
           rating: number | null
           updated_at: string | null
+          wallet_address: string | null
         }
         Insert: {
           age: number
+          basename?: string | null
           bio?: string | null
           created_at?: string | null
           display_name: string
@@ -291,9 +294,11 @@ export type Database = {
           profile_image?: string | null
           rating?: number | null
           updated_at?: string | null
+          wallet_address?: string | null
         }
         Update: {
           age?: number
+          basename?: string | null
           bio?: string | null
           created_at?: string | null
           display_name?: string
@@ -305,6 +310,7 @@ export type Database = {
           profile_image?: string | null
           rating?: number | null
           updated_at?: string | null
+          wallet_address?: string | null
         }
         Relationships: []
       }
@@ -555,6 +561,14 @@ export type Database = {
           p_description?: string
           p_reference: string
           p_user_id: string
+        }
+        Returns: Json
+      }
+      handle_wallet_auth: {
+        Args: {
+          p_basename?: string
+          p_display_name?: string
+          p_wallet_address: string
         }
         Returns: Json
       }
