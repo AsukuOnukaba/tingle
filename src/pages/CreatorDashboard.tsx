@@ -81,6 +81,20 @@ const CreatorDashboard = () => {
 
       if (creatorError) throw creatorError;
 
+      // If no creator record exists, show zero stats
+      if (!creatorData) {
+        console.log("No creator record found for user");
+        setStats({
+          total_uploads: 0,
+          earnings: 0,
+          premium_sales: 0,
+          wallet_balance: 0,
+          pending_withdrawals: 0,
+        });
+        setLoading(false);
+        return;
+      }
+
       // Get wallet balance
       const { data: walletData, error: walletError } = await sb
         .from("wallets")
@@ -90,20 +104,23 @@ const CreatorDashboard = () => {
 
       if (walletError) throw walletError;
 
-      // Get sales count
-      const { count: salesCount, error: salesError } = await sb
-        .from("media_purchases")
-        .select("*", { count: "exact", head: true })
-        .in(
-          "media_id",
-          await sb
-            .from("media")
-            .select("id")
-            .eq("creator_id", creatorData?.id || '')
-            .then((res: any) => res.data?.map((c: any) => c.id) || [])
-        );
+      // Get sales count - only if we have a creator ID
+      let salesCount = 0;
+      if (creatorData.id) {
+        const { data: mediaIds } = await sb
+          .from("media")
+          .select("id")
+          .eq("creator_id", creatorData.id);
 
-      if (salesError) throw salesError;
+        if (mediaIds && mediaIds.length > 0) {
+          const { count } = await sb
+            .from("media_purchases")
+            .select("*", { count: "exact", head: true })
+            .in("media_id", mediaIds.map((m: any) => m.id));
+          
+          salesCount = count || 0;
+        }
+      }
 
       // Get pending withdrawals
       const { data: withdrawalsData, error: withdrawalsError } = await sb
@@ -116,15 +133,19 @@ const CreatorDashboard = () => {
 
       const pendingAmount = withdrawalsData?.reduce((sum, w: any) => sum + Number(w.amount), 0) || 0;
 
-      // Fetch uploads
-      const { data: mediaData, error: mediaError } = await sb
-        .from("media")
-        .select("*")
-        .eq("creator_id", creatorData?.id || '')
-        .order("created_at", { ascending: false });
+      // Fetch uploads - only if we have a creator ID
+      let mediaData: any[] = [];
+      if (creatorData.id) {
+        const { data, error: mediaError } = await sb
+          .from("media")
+          .select("*")
+          .eq("creator_id", creatorData.id)
+          .order("created_at", { ascending: false });
 
-      if (mediaError) throw mediaError;
-      setUploads(mediaData || []);
+        if (mediaError) throw mediaError;
+        mediaData = data || [];
+      }
+      setUploads(mediaData);
 
       // Fetch transactions
       const { data: txData, error: txError } = await sb
@@ -137,9 +158,9 @@ const CreatorDashboard = () => {
       setTransactions(txData || []);
 
       setStats({
-        total_uploads: creatorData ? (creatorData as any).total_uploads || 0 : 0,
-        earnings: creatorData ? Number((creatorData as any).earnings) || 0 : 0,
-        premium_sales: salesCount || 0,
+        total_uploads: (creatorData as any).total_uploads || 0,
+        earnings: Number((creatorData as any).earnings) || 0,
+        premium_sales: salesCount,
         wallet_balance: walletData ? Number((walletData as any).balance) || 0 : 0,
         pending_withdrawals: pendingAmount,
       });
