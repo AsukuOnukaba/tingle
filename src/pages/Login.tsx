@@ -30,19 +30,28 @@ const Login = () => {
   useEffect(() => {
     // Check if user is already logged in and redirect admins accordingly
     const checkUserAndRedirect = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: rolesData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id);
-        
-        const roles = rolesData?.map(r => r.role) || [];
-        if (roles.includes('admin')) {
-          navigate("/admin");
-        } else {
-          navigate("/home");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: rolesData, error } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id);
+          
+          if (error) {
+            console.error('Error fetching roles:', error);
+            return;
+          }
+          
+          const roles = rolesData?.map(r => r.role) || [];
+          if (roles.includes('admin')) {
+            navigate("/admin", { replace: true });
+          } else {
+            navigate("/home", { replace: true });
+          }
         }
+      } catch (error) {
+        console.error('Session check error:', error);
       }
     };
     checkUserAndRedirect();
@@ -93,10 +102,20 @@ const Login = () => {
         if (error) throw error;
 
         // Check if user is admin and redirect accordingly
-        const { data: rolesData } = await supabase
+        const { data: rolesData, error: rolesError } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', data.user.id);
+
+        if (rolesError) {
+          console.error('Error fetching user roles:', rolesError);
+          toast({
+            title: "Login successful",
+            description: "Welcome back!",
+          });
+          navigate("/home", { replace: true });
+          return;
+        }
 
         const roles = rolesData?.map(r => r.role) || [];
         
@@ -105,11 +124,14 @@ const Login = () => {
           description: roles.includes('admin') ? "Welcome back, Admin!" : "Welcome back!",
         });
         
-        if (roles.includes('admin')) {
-          navigate("/admin");
-        } else {
-          navigate("/home");
-        }
+        // Use setTimeout to avoid race conditions with useEffect
+        setTimeout(() => {
+          if (roles.includes('admin')) {
+            navigate("/admin", { replace: true });
+          } else {
+            navigate("/home", { replace: true });
+          }
+        }, 100);
       } else {
         // Sign up flow
         passwordSchema.parse(formData.password);
