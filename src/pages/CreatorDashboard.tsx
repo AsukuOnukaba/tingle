@@ -16,6 +16,7 @@ import { useRoles } from "@/hooks/useRoles";
 import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
+import { StatDetailModal } from "@/components/StatDetailModal";
 import {
   LineChart,
   Line,
@@ -48,7 +49,18 @@ const CreatorDashboard = () => {
     pending_withdrawals: 0,
   });
   const [salesData, setSalesData] = useState<any[]>([]);
+  const [uploads, setUploads] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: 'uploads' | 'earnings' | 'sales' | 'balance' | null;
+    data: any[];
+  }>({
+    isOpen: false,
+    type: null,
+    data: [],
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -103,6 +115,26 @@ const CreatorDashboard = () => {
       if (withdrawalsError) throw withdrawalsError;
 
       const pendingAmount = withdrawalsData?.reduce((sum, w: any) => sum + Number(w.amount), 0) || 0;
+
+      // Fetch uploads
+      const { data: mediaData, error: mediaError } = await sb
+        .from("media")
+        .select("*")
+        .eq("creator_id", creatorData?.id || '')
+        .order("created_at", { ascending: false });
+
+      if (mediaError) throw mediaError;
+      setUploads(mediaData || []);
+
+      // Fetch transactions
+      const { data: txData, error: txError } = await sb
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("created_at", { ascending: false });
+
+      if (txError) throw txError;
+      setTransactions(txData || []);
 
       setStats({
         total_uploads: creatorData ? (creatorData as any).total_uploads || 0 : 0,
@@ -174,6 +206,31 @@ const CreatorDashboard = () => {
     return <Navigate to="/creator" replace />;
   }
 
+  const handleStatClick = (type: 'uploads' | 'earnings' | 'sales' | 'balance') => {
+    let data: any[] = [];
+    
+    switch (type) {
+      case 'uploads':
+        data = uploads;
+        break;
+      case 'earnings':
+        data = transactions.filter(t => t.type === 'credit');
+        break;
+      case 'sales':
+        data = uploads.filter(u => u.is_premium);
+        break;
+      case 'balance':
+        data = transactions;
+        break;
+    }
+
+    setModalState({
+      isOpen: true,
+      type,
+      data,
+    });
+  };
+
   const statCards = [
     {
       title: "Total Uploads",
@@ -181,6 +238,7 @@ const CreatorDashboard = () => {
       icon: Upload,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
+      type: 'uploads' as const,
     },
     {
       title: "Total Earnings",
@@ -188,6 +246,7 @@ const CreatorDashboard = () => {
       icon: DollarSign,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
+      type: 'earnings' as const,
     },
     {
       title: "Premium Sales",
@@ -195,6 +254,7 @@ const CreatorDashboard = () => {
       icon: TrendingUp,
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
+      type: 'sales' as const,
     },
     {
       title: "Wallet Balance",
@@ -202,6 +262,7 @@ const CreatorDashboard = () => {
       icon: Wallet,
       color: "text-orange-500",
       bgColor: "bg-orange-500/10",
+      type: 'balance' as const,
     },
   ];
 
@@ -235,8 +296,9 @@ const CreatorDashboard = () => {
               return (
                 <Card
                   key={stat.title}
-                  className="glass-card hover-scale animate-fade-up"
+                  className="glass-card hover-scale animate-fade-up cursor-pointer transition-all hover:shadow-lg"
                   style={{ animationDelay: `${index * 0.1}s` }}
+                  onClick={() => handleStatClick(stat.type)}
                 >
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -248,11 +310,24 @@ const CreatorDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{stat.value}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Click to view details</p>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
+
+          {/* Detail Modal */}
+          {modalState.type && (
+            <StatDetailModal
+              isOpen={modalState.isOpen}
+              onClose={() => setModalState({ isOpen: false, type: null, data: [] })}
+              title={statCards.find(s => s.type === modalState.type)?.title || ''}
+              icon={statCards.find(s => s.type === modalState.type)?.icon || Upload}
+              data={modalState.data}
+              type={modalState.type}
+            />
+          )}
 
           {/* Charts and Actions */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

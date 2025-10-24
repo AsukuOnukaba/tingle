@@ -7,6 +7,7 @@ import {
   DollarSign,
   CheckCircle,
   XCircle,
+  TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { useRoles } from "@/hooks/useRoles";
 import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
+import { StatDetailModal } from "@/components/StatDetailModal";
 
 const sb = supabase as unknown as SupabaseClient<any>;
 
@@ -43,6 +45,7 @@ interface Transaction {
   id: string;
   amount: number;
   status: string;
+  type: string;
   created_at: string;
   user_id: string;
 }
@@ -52,11 +55,22 @@ const AdminPanel = () => {
   const { isAdmin, loading: rolesLoading } = useRoles();
   const [creators, setCreators] = useState<Creator[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalCreators: 0,
     pendingCreators: 0,
     totalTransactions: 0,
+    totalRevenue: 0,
+  });
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: 'users' | 'creators' | 'transactions' | 'revenue' | null;
+    data: any[];
+  }>({
+    isOpen: false,
+    type: null,
+    data: [],
   });
   const { toast } = useToast();
 
@@ -91,21 +105,30 @@ const AdminPanel = () => {
         .from("transactions")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (transactionsError) throw transactionsError;
       setTransactions(transactionsData || []);
 
-      // Calculate stats
-      const { count: usersCount } = await sb
+      // Fetch users
+      const { data: usersData, error: usersError } = await sb
         .from("wallets")
-        .select("*", { count: "exact", head: true });
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (usersError) throw usersError;
+      setUsers(usersData || []);
+
+      // Calculate total revenue
+      const totalRevenue = transactionsData?.reduce((sum: number, t: any) => 
+        t.type === 'credit' ? sum + Number(t.amount) : sum, 0) || 0;
 
       setStats({
-        totalUsers: usersCount || 0,
+        totalUsers: usersData?.length || 0,
         totalCreators: creatorsData?.filter((c: any) => c.status === 'approved').length || 0,
         pendingCreators: creatorsData?.filter((c: any) => c.status === 'pending').length || 0,
         totalTransactions: transactionsData?.length || 0,
+        totalRevenue,
       });
     } catch (error) {
       toast({
@@ -114,6 +137,31 @@ const AdminPanel = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleStatClick = (type: 'users' | 'creators' | 'transactions' | 'revenue') => {
+    let data: any[] = [];
+    
+    switch (type) {
+      case 'users':
+        data = users;
+        break;
+      case 'creators':
+        data = creators.filter(c => c.status === 'approved');
+        break;
+      case 'transactions':
+        data = transactions;
+        break;
+      case 'revenue':
+        data = transactions.filter(t => t.type === 'credit');
+        break;
+    }
+
+    setModalState({
+      isOpen: true,
+      type,
+      data,
+    });
   };
 
   const handleCreatorApproval = async (creatorId: string, status: 'approved' | 'rejected') => {
@@ -183,6 +231,7 @@ const AdminPanel = () => {
       icon: Users,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
+      type: 'users' as const,
     },
     {
       title: "Active Creators",
@@ -190,13 +239,15 @@ const AdminPanel = () => {
       icon: UserCheck,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
+      type: 'creators' as const,
     },
     {
-      title: "Pending Approvals",
-      value: stats.pendingCreators,
-      icon: Users,
-      color: "text-orange-500",
-      bgColor: "bg-orange-500/10",
+      title: "Total Revenue",
+      value: `$${stats.totalRevenue.toFixed(2)}`,
+      icon: TrendingUp,
+      color: "text-emerald-500",
+      bgColor: "bg-emerald-500/10",
+      type: 'revenue' as const,
     },
     {
       title: "Total Transactions",
@@ -204,6 +255,7 @@ const AdminPanel = () => {
       icon: ShoppingCart,
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
+      type: 'transactions' as const,
     },
   ];
 
@@ -228,8 +280,9 @@ const AdminPanel = () => {
               return (
                 <Card
                   key={stat.title}
-                  className="glass-card hover-scale animate-fade-up"
+                  className="glass-card hover-scale animate-fade-up cursor-pointer transition-all hover:shadow-lg"
                   style={{ animationDelay: `${index * 0.1}s` }}
+                  onClick={() => handleStatClick(stat.type)}
                 >
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -241,11 +294,24 @@ const AdminPanel = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{stat.value}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Click to view details</p>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
+
+          {/* Detail Modal */}
+          {modalState.type && (
+            <StatDetailModal
+              isOpen={modalState.isOpen}
+              onClose={() => setModalState({ isOpen: false, type: null, data: [] })}
+              title={statCards.find(s => s.type === modalState.type)?.title || ''}
+              icon={statCards.find(s => s.type === modalState.type)?.icon || Users}
+              data={modalState.data}
+              type={modalState.type === 'revenue' ? 'earnings' : modalState.type}
+            />
+          )}
 
           {/* Tabs for different sections */}
           <Tabs defaultValue="creators" className="animate-fade-up" style={{ animationDelay: "0.4s" }}>
