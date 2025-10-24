@@ -204,11 +204,20 @@ const CreatorDashboard = () => {
       <div className="pt-20 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="mb-8 animate-fade-up">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Creator Dashboard</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Track your performance and manage your content
-            </p>
+          <div className="mb-8 flex justify-between items-center animate-fade-up">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">Creator Dashboard</h1>
+              <p className="text-sm md:text-base text-muted-foreground">
+                Track your performance and manage your content
+              </p>
+            </div>
+            <Button
+              onClick={() => window.location.href = '/manage-plans'}
+              className="gradient-primary neon-glow"
+            >
+              <Wallet className="w-4 h-4 mr-2" />
+              Manage Plans
+            </Button>
           </div>
 
           {/* Stats Grid */}

@@ -330,19 +330,48 @@ const Chat = () => {
         {/* Message Input */}
         <div className="glass-card border-t border-border/50 px-4 py-4">
           <div className="max-w-4xl mx-auto">
+            {!profile.isOnline && (
+              <div className="mb-3 p-3 bg-muted/50 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">
+                  This creator is currently offline. They'll see your message when they return.
+                </p>
+              </div>
+            )}
             <form onSubmit={handleSendMessage} className="flex space-x-2">
               <div className="flex space-x-2">
-                <Button type="button" variant="ghost" size="sm" className="hover:bg-muted/50 transition-smooth">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="hover:bg-muted/50 transition-smooth"
+                  disabled={!profile.isOnline}
+                >
                   <Image className="w-4 h-4" />
                 </Button>
-                <Button type="button" variant="ghost" size="sm" className="hover:bg-muted/50 transition-smooth">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="hover:bg-muted/50 transition-smooth"
+                  disabled={!profile.isOnline}
+                >
                   <Smile className="w-4 h-4" />
                 </Button>
               </div>
 
-              <Input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." className="flex-1 bg-muted/50 border-border/50 focus:border-primary transition-smooth" />
+              <Input 
+                value={newMessage} 
+                onChange={(e) => setNewMessage(e.target.value)} 
+                placeholder={profile.isOnline ? "Type a message..." : "Creator is offline..."} 
+                className="flex-1 bg-muted/50 border-border/50 focus:border-primary transition-smooth"
+                disabled={!profile.isOnline}
+              />
 
-              <Button type="submit" disabled={!newMessage.trim()} className="gradient-primary hover:opacity-90 transition-smooth neon-glow">
+              <Button 
+                type="submit" 
+                disabled={!newMessage.trim() || !profile.isOnline} 
+                className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
+              >
                 <Send className="w-4 h-4" />
               </Button>
             </form>

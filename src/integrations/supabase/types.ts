@@ -203,6 +203,66 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_intents: {
+        Row: {
+          amount: number
+          created_at: string | null
+          creator_id: string | null
+          currency: string | null
+          id: string
+          metadata: Json | null
+          payment_provider: string | null
+          plan_id: string | null
+          reference: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          creator_id?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_provider?: string | null
+          plan_id?: string | null
+          reference: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          creator_id?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_provider?: string | null
+          plan_id?: string | null
+          reference?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_intents_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_intents_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           age: number
@@ -211,6 +271,7 @@ export type Database = {
           display_name: string
           id: string
           is_online: boolean | null
+          last_seen: string | null
           location: string | null
           price: number | null
           profile_image: string | null
@@ -224,6 +285,7 @@ export type Database = {
           display_name: string
           id: string
           is_online?: boolean | null
+          last_seen?: string | null
           location?: string | null
           price?: number | null
           profile_image?: string | null
@@ -237,6 +299,7 @@ export type Database = {
           display_name?: string
           id?: string
           is_online?: boolean | null
+          last_seen?: string | null
           location?: string | null
           price?: number | null
           profile_image?: string | null
@@ -245,29 +308,82 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          description: string | null
+          duration_days: number
+          features: Json | null
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          description?: string | null
+          duration_days?: number
+          features?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          description?: string | null
+          duration_days?: number
+          features?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_plans_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
+          amount_paid: number | null
           created_at: string | null
           creator_id: string
           expires_at: string | null
           id: string
           is_active: boolean | null
+          plan_id: string | null
           subscriber_id: string
         }
         Insert: {
+          amount_paid?: number | null
           created_at?: string | null
           creator_id: string
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
+          plan_id?: string | null
           subscriber_id: string
         }
         Update: {
+          amount_paid?: number | null
           created_at?: string | null
           creator_id?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
+          plan_id?: string | null
           subscriber_id?: string
         }
         Relationships: [
@@ -276,6 +392,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
         ]

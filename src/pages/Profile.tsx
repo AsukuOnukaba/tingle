@@ -75,7 +75,8 @@ const Profile = () => {
       toast.error("Please login to subscribe");
       return;
     }
-    setShowPurchaseModal(true);
+    // Navigate to subscription plans page
+    window.location.href = `/subscription/${id}`;
   };
 
   const handleSubscriptionPurchase = async () => {

@@ -26,6 +26,9 @@ import AdminPanel from "./pages/AdminPanel";
 import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
 
+import SubscriptionPlans from "./pages/SubscriptionPlans";
+import ManagePlans from "./pages/ManagePlans";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -45,6 +48,8 @@ const App = () => (
           <Route path="/chat/:recipientId" element={<Chat />} />
           <Route path="/creator" element={<Creator />} />
           <Route path="/creator/pending" element={<CreatorPending />} />
+          <Route path="/subscription/:creatorId" element={<SubscriptionPlans />} />
+          <Route path="/manage-plans" element={<ManagePlans />} />
           <Route path="/about" element={<About />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
