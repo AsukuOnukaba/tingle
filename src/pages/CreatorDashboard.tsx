@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { 
   TrendingUp, 
   Upload, 
@@ -37,6 +37,7 @@ interface CreatorStats {
 }
 
 const CreatorDashboard = () => {
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isCreator, isAdmin, loading: rolesLoading } = useRoles();
   const [stats, setStats] = useState<CreatorStats>({
@@ -212,7 +213,7 @@ const CreatorDashboard = () => {
               </p>
             </div>
             <Button
-              onClick={() => window.location.href = '/manage-plans'}
+              onClick={() => navigate('/manage-plans')}
               className="gradient-primary neon-glow"
             >
               <Wallet className="w-4 h-4 mr-2" />
