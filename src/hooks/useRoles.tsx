@@ -24,6 +24,7 @@ export const useRoles = () => {
   }, [user]);
 
   const fetchUserRoles = async () => {
+    setLoading(true); // Ensure loading is true while fetching
     try {
       console.log('🔍 Fetching roles for user:', user?.id);
       const { data, error } = await sb
@@ -44,6 +45,10 @@ export const useRoles = () => {
       console.log('🔐 Is Admin:', userRoles.includes('admin'));
     } catch (error) {
       console.error('Error fetching roles:', error);
+      // On error, set safe defaults
+      setRoles([]);
+      setIsAdmin(false);
+      setIsCreator(false);
     } finally {
       setLoading(false);
     }

@@ -145,7 +145,7 @@ const AdminPanel = () => {
     }
   };
 
-  // Wait for both auth and roles to load
+  // Wait for both auth and roles to load completely
   if (authLoading || rolesLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -157,12 +157,13 @@ const AdminPanel = () => {
     );
   }
 
-  // Only redirect if we're sure they're not admin (after loading is done)
+  // After loading completes, check authentication and roles
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isAdmin) {
+  // Only redirect if loading is definitely complete and user is confirmed not admin
+  if (!authLoading && !rolesLoading && !isAdmin) {
     return <Navigate to="/home" replace />;
   }
 

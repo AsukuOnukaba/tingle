@@ -152,7 +152,8 @@ const CreatorDashboard = () => {
     }
   };
 
-  if (authLoading || rolesLoading) {
+  // Wait for both auth and roles to load completely
+  if (authLoading || rolesLoading || loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -163,7 +164,13 @@ const CreatorDashboard = () => {
     );
   }
 
-  if (!user || (!isCreator && !isAdmin)) {
+  // After loading completes, check authentication and roles
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Only redirect if loading is definitely complete and user is confirmed not creator/admin
+  if (!authLoading && !rolesLoading && !loading && !isCreator && !isAdmin) {
     return <Navigate to="/creator" replace />;
   }
 
