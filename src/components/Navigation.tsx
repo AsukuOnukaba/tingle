@@ -45,7 +45,7 @@ const Navigation = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-1 lg:space-x-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -53,13 +53,13 @@ const Navigation = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-smooth hover-scale ${isActive
+                  className={`flex items-center space-x-1.5 lg:space-x-2 px-2 lg:px-3 py-2 rounded-lg transition-smooth hover-scale ${isActive
                       ? "gradient-primary text-white neon-glow"
                       : "text-muted-foreground hover:text-primary"
                     }`}
                 >
                   <Icon className="w-4 h-4" />
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="text-xs lg:text-sm font-medium">{item.label}</span>
                 </Link>
               );
             })}
@@ -68,26 +68,26 @@ const Navigation = () => {
             {(isCreator || isAdmin) && (
               <Link
                 to="/creator-dashboard"
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-smooth hover-scale ${location.pathname === "/creator-dashboard"
+                className={`flex items-center space-x-1.5 lg:space-x-2 px-2 lg:px-3 py-2 rounded-lg transition-smooth hover-scale ${location.pathname === "/creator-dashboard"
                     ? "gradient-primary text-white neon-glow"
                     : "text-muted-foreground hover:text-primary"
                   }`}
               >
                 <LayoutDashboard className="w-4 h-4" />
-                <span className="text-sm font-medium">Dashboard</span>
+                <span className="text-xs lg:text-sm font-medium">Dashboard</span>
               </Link>
             )}
 
             {isAdmin && (
               <Link
                 to="/admin"
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-smooth hover-scale ${location.pathname === "/admin"
+                className={`flex items-center space-x-1.5 lg:space-x-2 px-2 lg:px-3 py-2 rounded-lg transition-smooth hover-scale ${location.pathname === "/admin"
                     ? "gradient-primary text-white neon-glow"
                     : "text-muted-foreground hover:text-primary"
                   }`}
               >
                 <Shield className="w-4 h-4" />
-                <span className="text-sm font-medium">Admin</span>
+                <span className="text-xs lg:text-sm font-medium">Admin</span>
               </Link>
             )}
 
