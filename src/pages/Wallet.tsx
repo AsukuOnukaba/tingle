@@ -57,13 +57,13 @@ const Wallet = () => {
   const fetchWalletData = async () => {
     try {
       const { data, error } = await sb
-        .from("user_wallets")
-        .select("balance, currency")
+        .from("wallets")
+        .select("balance")
         .eq("user_id", user?.id)
         .maybeSingle();
 
       if (error) throw error;
-      setWallet(data);
+      setWallet(data ? { balance: data.balance, currency: 'NGN' } : null);
     } catch (error) {
       console.error("Error fetching wallet:", error);
       toast({
