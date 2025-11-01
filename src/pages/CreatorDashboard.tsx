@@ -167,7 +167,7 @@ const CreatorDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, toast]);
+  }, [user]);
 
   const fetchSalesData = useCallback(async () => {
     try {
