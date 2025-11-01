@@ -26,8 +26,8 @@ interface Plan {
 
 const ManagePlans = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { isCreator, isAdmin } = useRoles();
+  const { user, loading: authLoading } = useAuth();
+  const { isCreator, isAdmin, loading: rolesLoading } = useRoles();
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +42,9 @@ const ManagePlans = () => {
   });
 
   useEffect(() => {
+    // Wait for auth and roles to load before checking
+    if (authLoading || rolesLoading) return;
+
     if (!user) {
       navigate("/login");
       return;
@@ -52,7 +55,7 @@ const ManagePlans = () => {
       return;
     }
     fetchPlans();
-  }, [user, isCreator, isAdmin]);
+  }, [user, isCreator, isAdmin, authLoading, rolesLoading]);
 
   const fetchPlans = async () => {
     try {
@@ -233,6 +236,18 @@ const ManagePlans = () => {
       });
     }
   };
+
+  // Show loading spinner while checking auth
+  if (authLoading || rolesLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-20 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        </div>
+      </div>
+    );
+  }
 
   if (!user || (!isCreator && !isAdmin)) return null;
 
