@@ -28,6 +28,11 @@ import NotFound from "./pages/NotFound";
 
 import SubscriptionPlans from "./pages/SubscriptionPlans";
 import ManagePlans from "./pages/ManagePlans";
+import Settings from "./pages/Settings";
+import Support from "./pages/Support";
+import Verification from "./pages/Verification";
+import SubscriptionManagement from "./pages/SubscriptionManagement";
+import ContentBackup from "./pages/ContentBackup";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +65,11 @@ const App = () => (
           <Route path="/creator-dashboard" element={<CreatorDashboard />} />
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/verification" element={<Verification />} />
+          <Route path="/subscriptions" element={<SubscriptionManagement />} />
+          <Route path="/backup" element={<ContentBackup />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
