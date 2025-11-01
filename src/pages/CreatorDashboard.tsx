@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { 
   TrendingUp, 
@@ -63,14 +63,7 @@ const CreatorDashboard = () => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (user && (isCreator || isAdmin)) {
-      fetchCreatorStats();
-      fetchSalesData();
-    }
-  }, [user, isCreator, isAdmin]);
-
-  const fetchCreatorStats = async () => {
+  const fetchCreatorStats = useCallback(async () => {
     try {
       // Get creator info
       const { data: creatorData, error: creatorError } = await sb
@@ -174,9 +167,9 @@ const CreatorDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
-  const fetchSalesData = async () => {
+  const fetchSalesData = useCallback(async () => {
     try {
     const { data, error } = await sb
       .from("media_purchases")
@@ -203,7 +196,14 @@ const CreatorDashboard = () => {
     } catch (error) {
       console.error("Error fetching sales data:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user && (isCreator || isAdmin)) {
+      fetchCreatorStats();
+      fetchSalesData();
+    }
+  }, [user, isCreator, isAdmin, fetchCreatorStats, fetchSalesData]);
 
   // Wait for both auth and roles to load completely
   if (authLoading || rolesLoading || loading) {
@@ -252,7 +252,7 @@ const CreatorDashboard = () => {
     });
   };
 
-  const statCards = [
+  const statCards = useMemo(() => [
     {
       title: "Total Uploads",
       value: stats.total_uploads,
@@ -285,7 +285,7 @@ const CreatorDashboard = () => {
       bgColor: "bg-orange-500/10",
       type: 'balance' as const,
     },
-  ];
+  ], [stats]);
 
   return (
     <div className="min-h-screen bg-background">

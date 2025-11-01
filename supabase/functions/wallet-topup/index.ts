@@ -6,6 +6,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiter
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const rateLimits = new Map<string, RateLimitEntry>();
+
+function checkRateLimit(identifier: string, maxAttempts: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = rateLimits.get(identifier);
+
+  if (!entry || now > entry.resetTime) {
+    rateLimits.set(identifier, { count: 1, resetTime: now + windowMs });
+    return false;
+  }
+
+  if (entry.count >= maxAttempts) {
+    return true;
+  }
+
+  entry.count++;
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -26,6 +51,11 @@ serve(async (req) => {
     
     if (userError || !user) {
       throw new Error('UNAUTHORIZED');
+    }
+
+    // Rate limiting: 5 top-ups per hour per user
+    if (checkRateLimit(`topup:${user.id}`, 5, 60 * 60 * 1000)) {
+      throw new Error('RATE_LIMIT_EXCEEDED');
     }
 
     const body = await req.json();
@@ -106,6 +136,7 @@ serve(async (req) => {
       'INVALID_REFERENCE': 'Invalid payment reference',
       'PAYMENT_VERIFICATION_FAILED': 'Payment verification failed',
       'INVALID_AMOUNT': 'Invalid transaction amount',
+      'RATE_LIMIT_EXCEEDED': 'Too many requests. Please try again later.',
     };
     
     const errorCode = error instanceof Error ? error.message : 'UNKNOWN_ERROR';

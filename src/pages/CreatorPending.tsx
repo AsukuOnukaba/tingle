@@ -21,8 +21,8 @@ const CreatorPending = () => {
       }
 
       try {
-        const { data, error } = await (supabase as any)
-          .from("creator_applications")
+        const { data, error } = await supabase
+          .from("creators")
           .select("*")
           .eq("user_id", user.id)
           .maybeSingle();
@@ -38,14 +38,14 @@ const CreatorPending = () => {
           setApplication(data);
           
           if (data.status === 'approved') {
-            const { data: roles } = await (supabase as any)
+            const { data: roles } = await supabase
               .from("user_roles")
               .select("role")
               .eq("user_id", user.id)
               .eq("role", "creator");
             
             if (roles && roles.length > 0) {
-              navigate("/creator");
+              navigate("/creator-dashboard");
             }
           }
         }

@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { z } from "zod";
+import { rateLimiter } from "@/lib/rateLimiter";
 
 const emailSchema = z.string().email("Invalid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -83,6 +84,13 @@ const Login = () => {
 
     try {
       emailSchema.parse(formData.email);
+
+      // Rate limiting for auth attempts
+      const rateLimitKey = `auth:${formData.email}`;
+      if (rateLimiter.isRateLimited(rateLimitKey, 5, 15 * 60 * 1000)) {
+        const resetTime = rateLimiter.getTimeUntilReset(rateLimitKey);
+        throw new Error(`Too many attempts. Please try again in ${resetTime} seconds.`);
+      }
 
       if (isResetMode) {
         // Password reset flow
