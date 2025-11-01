@@ -38,7 +38,7 @@ export const WalletConnect = ({ currentWalletAddress, onConnect }: WalletConnect
     if (typeof window.ethereum === 'undefined') {
       toast({
         title: "Wallet Not Found",
-        description: "Please install OKX Wallet extension to connect your wallet",
+        description: "Please install a Web3 wallet (MetaMask, OKX, etc.) to connect",
         variant: "destructive",
       });
       return;
@@ -149,7 +149,7 @@ export const WalletConnect = ({ currentWalletAddress, onConnect }: WalletConnect
           className="w-full"
         >
           <Wallet className="mr-2 h-4 w-4" />
-          Connect OKX Wallet
+          Connect Crypto Wallet
         </Button>
       )}
     </div>
