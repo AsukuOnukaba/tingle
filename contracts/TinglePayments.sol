@@ -45,7 +45,6 @@ contract TinglePayments is ReentrancyGuard, Ownable, Pausable {
     // Primary storage
     mapping(bytes32 => Purchase) public purchasesByRef;
     mapping(string => bytes32[]) public contentIdToRefs;     // multiple purchases per contentId
-    mapping(bytes32 => bool) public purchaseExists;         // dedupe key: keccak256(abi.encode(buyer, seller, contentId))
 
     mapping(address => uint256) public creatorBalances;
     mapping(address => uint256) public creatorTotalEarnings;
@@ -136,11 +135,6 @@ contract TinglePayments is ReentrancyGuard, Ownable, Pausable {
         require(msg.value <= MAX_PURCHASE_AMOUNT, "Amount too high");
         require(bytes(contentId).length > 0 && bytes(contentId).length <= 128, "Invalid contentId");
         require(creator != msg.sender, "Cannot purchase own content");
-
-        // Deduplication key: buyer + seller + contentId
-        bytes32 dedupeKey = keccak256(abi.encode(msg.sender, creator, contentId));
-        require(!purchaseExists[dedupeKey], "Already purchased this content");
-        purchaseExists[dedupeKey] = true;
 
         // Unique transaction ref
         bytes32 transactionRef = keccak256(abi.encodePacked(msg.sender, creator, contentId, block.timestamp, block.number, purchaseNonce++));
@@ -265,8 +259,7 @@ contract TinglePayments is ReentrancyGuard, Ownable, Pausable {
     /**
      * Platform withdraws its accumulated share.
      */
-    function withdrawPlatform() external nonReentrant whenNotPaused {
-        require(msg.sender == platformWallet, "Only platform wallet");
+    function withdrawPlatform() external onlyPlatform nonReentrant whenNotPaused {
         uint256 amount = platformBalance;
         require(amount > 0, "No platform balance");
 
@@ -282,9 +275,19 @@ contract TinglePayments is ReentrancyGuard, Ownable, Pausable {
     /**
      * Change the platform wallet address.
      * Only owner (deployer) can call this.
+     * Transfers any outstanding platform balance to the new wallet.
      */
     function updatePlatformWallet(address newWallet) external onlyOwner validAddress(newWallet) {
         address old = platformWallet;
+        uint256 balance = platformBalance;
+        
+        // Transfer outstanding balance to new wallet if any exists
+        if (balance > 0) {
+            platformBalance = 0;
+            (bool success, ) = payable(newWallet).call{value: balance}("");
+            require(success, "Balance transfer to new wallet failed");
+        }
+        
         platformWallet = newWallet;
         emit PlatformWalletUpdated(old, newWallet);
     }
@@ -303,8 +306,15 @@ contract TinglePayments is ReentrancyGuard, Ownable, Pausable {
     // ============ View Helpers ============
 
     function hasPurchased(address buyer, address creator, string calldata contentId) external view returns (bool) {
-        bytes32 dedupeKey = keccak256(abi.encode(buyer, creator, contentId));
-        return purchaseExists[dedupeKey];
+        // Check if buyer has any completed purchases for this content
+        bytes32[] memory refs = contentIdToRefs[contentId];
+        for (uint256 i = 0; i < refs.length; i++) {
+            Purchase memory p = purchasesByRef[refs[i]];
+            if (p.buyer == buyer && p.seller == creator && p.status == EscrowStatus.Released) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function getPurchaseCount() external view returns (uint256) {
