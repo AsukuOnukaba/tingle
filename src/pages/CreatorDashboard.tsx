@@ -205,28 +205,6 @@ const CreatorDashboard = () => {
     }
   }, [user, isCreator, isAdmin, fetchCreatorStats, fetchSalesData]);
 
-  // Wait for both auth and roles to load completely
-  if (authLoading || rolesLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <div className="pt-20 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-        </div>
-      </div>
-    );
-  }
-
-  // After loading completes, check authentication and roles
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Only redirect if loading is definitely complete and user is confirmed not creator/admin
-  if (!authLoading && !rolesLoading && !loading && !isCreator && !isAdmin) {
-    return <Navigate to="/creator" replace />;
-  }
-
   const handleStatClick = (type: 'uploads' | 'earnings' | 'sales' | 'balance') => {
     let data: any[] = [];
     
@@ -286,6 +264,28 @@ const CreatorDashboard = () => {
       type: 'balance' as const,
     },
   ], [stats]);
+
+  // Wait for both auth and roles to load completely
+  if (authLoading || rolesLoading || loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-20 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  // After loading completes, check authentication and roles
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Only redirect if loading is definitely complete and user is confirmed not creator/admin
+  if (!authLoading && !rolesLoading && !loading && !isCreator && !isAdmin) {
+    return <Navigate to="/creator" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
