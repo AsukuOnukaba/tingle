@@ -59,6 +59,12 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
 
       const reference = `TOP-${Date.now()}-${user.id.substring(0, 8)}`;
 
+      // Show loading toast
+      toast({
+        title: "Opening Payment Gateway",
+        description: "Please wait while we prepare your secure payment...",
+      });
+
       // Initialize Paystack payment
       // NOTE: This is a test key. In production, move to environment variable:
       // VITE_PAYSTACK_PUBLIC_KEY in .env file

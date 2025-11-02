@@ -25,7 +25,7 @@ const Navigation = () => {
     { path: "/explore", icon: Heart, label: "Explore" },
     { path: "/my-purchases", icon: ShoppingBag, label: "My Purchases" },
     { path: "/wallet", icon: Wallet, label: "Wallet" },
-    { path: "/profile/1", icon: User, label: "Profile" },
+    { path: "/my-profile", icon: User, label: "Profile" },
     { path: chatPath, icon: MessageCircle, label: "Chat" },
     { path: "/creator", icon: Sparkles, label: "Creator" },
   ];

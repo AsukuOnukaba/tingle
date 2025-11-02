@@ -10,6 +10,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Explore from "./pages/Explore";
 import Profile from "./pages/Profile";
+import MyProfile from "./pages/MyProfile";
 import Chat from "./pages/Chat";
 import ChatList from "./pages/ChatList";
 import Creator from "./pages/Creator";
@@ -49,6 +50,7 @@ const App = () => (
           <Route path="/explore" element={<Explore />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile/:id" element={<Profile />} />
+          <Route path="/my-profile" element={<MyProfile />} />
           <Route path="/chat" element={<ChatList />} />
           <Route path="/chat/:recipientId" element={<Chat />} />
           <Route path="/creator" element={<Creator />} />
