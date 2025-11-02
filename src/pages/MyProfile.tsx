@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
 import { toast } from "sonner";
+import { moderateImageFile } from "@/lib/contentModeration";
 
 interface UserPhoto {
   id: string;
@@ -173,11 +174,11 @@ const MyProfile = () => {
     if (!file || !user) return;
 
     // Moderate image file
-    const { moderateImageFile } = await import("@/lib/contentModeration");
     const moderation = moderateImageFile(file);
     
     if (!moderation.isAllowed) {
       toast.error(moderation.warnings.join(". "));
+      e.target.value = ""; // Reset input
       return;
     }
 
@@ -210,22 +211,29 @@ const MyProfile = () => {
       }
       
       toast.success(`${type === "profile" ? "Profile" : "Cover"} image uploaded successfully!`);
+      e.target.value = ""; // Reset input
     } catch (error: any) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
+      e.target.value = ""; // Reset input
     }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user) {
+      console.log("No file selected or user not found");
+      return;
+    }
+
+    console.log("Starting photo upload for file:", file.name);
 
     // Moderate image file
-    const { moderateImageFile } = await import("@/lib/contentModeration");
     const moderation = moderateImageFile(file);
     
     if (!moderation.isAllowed) {
       toast.error(moderation.warnings.join(". "));
+      e.target.value = ""; // Reset input
       return;
     }
 
@@ -239,15 +247,22 @@ const MyProfile = () => {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/photo-${Date.now()}.${fileExt}`;
 
+      console.log("Uploading to storage:", fileName);
+
       const { error: uploadError } = await supabase.storage
         .from("user-photos")
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
 
       const { data: urlData } = supabase.storage
         .from("user-photos")
         .getPublicUrl(fileName);
+
+      console.log("Inserting to database:", urlData.publicUrl);
 
       const { error: insertError } = await (supabase as any)
         .from("user_photos")
@@ -258,9 +273,13 @@ const MyProfile = () => {
           price: 0,
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw insertError;
+      }
 
       toast.success("Photo uploaded successfully!");
+      e.target.value = ""; // Reset input
       fetchPhotos();
     } catch (error: any) {
       console.error("Error uploading photo:", error);
