@@ -46,12 +46,12 @@ export const profiles: Record<number, Profile> = {
     posts: 156,
     joined: "January 2023",
     isOnline: true,
-    subscriptionPrice: "$24.99",
+    subscriptionPrice: "₦10,000",
     photos: [profile1, profile2, profile3],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$24.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$49.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦10,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦20,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   2: {
@@ -66,12 +66,12 @@ export const profiles: Record<number, Profile> = {
     posts: 132,
     joined: "March 2023",
     isOnline: false,
-    subscriptionPrice: "$19.99",
+    subscriptionPrice: "₦8,000",
     photos: [profile2, profile1, profile3],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$19.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$39.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦8,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦16,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   3: {
@@ -86,12 +86,12 @@ export const profiles: Record<number, Profile> = {
     posts: 189,
     joined: "February 2023",
     isOnline: true,
-    subscriptionPrice: "$29.99",
+    subscriptionPrice: "₦12,000",
     photos: [profile3, profile2, profile1],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$29.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$59.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦12,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦24,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   4: {
@@ -106,12 +106,12 @@ export const profiles: Record<number, Profile> = {
     posts: 145,
     joined: "April 2023",
     isOnline: true,
-    subscriptionPrice: "$22.99",
+    subscriptionPrice: "₦9,500",
     photos: [profile4, profile1, profile2],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$22.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$44.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦9,500", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦18,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   5: {
@@ -126,12 +126,12 @@ export const profiles: Record<number, Profile> = {
     posts: 201,
     joined: "January 2023",
     isOnline: false,
-    subscriptionPrice: "$34.99",
+    subscriptionPrice: "₦14,000",
     photos: [profile5, profile2, profile3],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$34.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$69.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦14,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦28,500", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   6: {
@@ -146,12 +146,12 @@ export const profiles: Record<number, Profile> = {
     posts: 98,
     joined: "May 2023",
     isOnline: true,
-    subscriptionPrice: "$18.99",
+    subscriptionPrice: "₦7,500",
     photos: [profile6, profile1, profile2],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$18.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$37.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦7,500", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦15,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   7: {
@@ -166,12 +166,12 @@ export const profiles: Record<number, Profile> = {
     posts: 167,
     joined: "February 2023",
     isOnline: true,
-    subscriptionPrice: "$27.99",
+    subscriptionPrice: "₦11,500",
     photos: [profile7, profile2, profile3],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$27.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$54.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦11,500", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦22,500", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   8: {
@@ -186,12 +186,12 @@ export const profiles: Record<number, Profile> = {
     posts: 143,
     joined: "March 2023",
     isOnline: false,
-    subscriptionPrice: "$21.99",
+    subscriptionPrice: "₦9,000",
     photos: [profile8, profile1, profile2],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$21.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$43.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦9,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦18,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   9: {
@@ -206,12 +206,12 @@ export const profiles: Record<number, Profile> = {
     posts: 178,
     joined: "January 2023",
     isOnline: true,
-    subscriptionPrice: "$32.99",
+    subscriptionPrice: "₦13,500",
     photos: [profile9, profile2, profile3],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$32.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$64.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦13,500", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦26,500", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   10: {
@@ -226,12 +226,12 @@ export const profiles: Record<number, Profile> = {
     posts: 127,
     joined: "April 2023",
     isOnline: true,
-    subscriptionPrice: "$20.99",
+    subscriptionPrice: "₦8,500",
     photos: [profile10, profile1, profile2],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$20.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$41.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦8,500", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦17,000", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   11: {
@@ -246,12 +246,12 @@ export const profiles: Record<number, Profile> = {
     posts: 154,
     joined: "February 2023",
     isOnline: false,
-    subscriptionPrice: "$26.99",
+    subscriptionPrice: "₦11,000",
     photos: [profile11, profile2, profile3],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$26.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$52.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦11,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦21,500", features: ["All content", "Video calls", "Personal attention"] },
     ]
   },
   12: {
@@ -266,12 +266,12 @@ export const profiles: Record<number, Profile> = {
     posts: 139,
     joined: "March 2023",
     isOnline: true,
-    subscriptionPrice: "$23.99",
+    subscriptionPrice: "₦10,000",
     photos: [profile12, profile1, profile2],
     tiers: [
       { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
-      { name: "Premium", price: "$23.99", features: ["Daily content", "Priority messages", "Custom requests"] },
-      { name: "VIP", price: "$47.99", features: ["All content", "Video calls", "Personal attention"] },
+      { name: "Premium", price: "₦10,000", features: ["Daily content", "Priority messages", "Custom requests"] },
+      { name: "VIP", price: "₦19,500", features: ["All content", "Video calls", "Personal attention"] },
     ]
   }
 };

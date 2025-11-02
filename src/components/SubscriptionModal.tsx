@@ -36,7 +36,7 @@ export const SubscriptionModal = ({
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const basePrice = parseFloat(plan.price.replace('$', '').replace('₦', ''));
+  const basePrice = parseFloat(plan.price.replace('₦', '').replace(',', ''));
   const annualDiscount = 0.15; // 15% discount for annual
   const monthlyPrice = basePrice;
   const annualPrice = basePrice * 12 * (1 - annualDiscount);
@@ -197,7 +197,7 @@ export const SubscriptionModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] glass-card">
+      <DialogContent className="sm:max-w-[500px] glass-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Subscribe to {creatorName}</DialogTitle>
           <DialogDescription>
