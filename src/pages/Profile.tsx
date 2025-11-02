@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { SubscriptionModal } from "@/components/SubscriptionModal";
-import { ProfileReviews } from "@/components/ProfileReviews";
 
 const Profile = () => {
   const { id } = useParams();
@@ -295,7 +294,7 @@ const Profile = () => {
 
           {/* Content Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="animate-fade-up" style={{ animationDelay: "0.2s" }}>
-            <TabsList className="grid grid-cols-4 mb-8 bg-muted/50">
+            <TabsList className="grid grid-cols-3 mb-8 bg-muted/50">
               <TabsTrigger value="photos" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
                 <Camera className="w-4 h-4 mr-2" />
                 Photos
@@ -306,10 +305,6 @@ const Profile = () => {
               <TabsTrigger value="pricing" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
                 <DollarSign className="w-4 h-4 mr-2" />
                 Pricing
-              </TabsTrigger>
-              <TabsTrigger value="reviews" className="data-[state=active]:gradient-primary data-[state=active]:text-white">
-                <Star className="w-4 h-4 mr-2" />
-                Reviews
               </TabsTrigger>
             </TabsList>
 
@@ -448,10 +443,6 @@ const Profile = () => {
                   </Card>
                 ))}
               </div>
-            </TabsContent>
-
-            <TabsContent value="reviews">
-              <ProfileReviews profileId={id || ""} />
             </TabsContent>
           </Tabs>
         </div>
