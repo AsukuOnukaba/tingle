@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Search, Filter, SlidersHorizontal } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import ProfileCard from "@/components/ProfileCard";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useInView } from 'react-intersection-observer';
+import { supabase } from "@/integrations/supabase/client";
 
 // Import profile images
 import profile1 from "@/assets/profiles/profile-1.jpg";
@@ -173,18 +174,73 @@ const ProfileItem = ({ profile }) => {
 const Explore = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filters = ["All", "Online", "New", "Premium", "Local"];
+  const filters = ["All", "Online", "Premium", "Free"];
 
-  const filteredProfiles = fakeProfiles.filter(profile => {
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    try {
+      // Fetch all profiles
+      const { data: profilesData, error: profilesError } = await (supabase as any)
+        .from('profiles')
+        .select('*')
+        .order('rating', { ascending: false });
+
+      if (profilesError) throw profilesError;
+
+      // Fetch creator info separately
+      const { data: creatorsData } = await (supabase as any)
+        .from('creators')
+        .select('user_id, status')
+        .eq('status', 'approved');
+
+      const creatorIds = new Set(creatorsData?.map((c: any) => c.user_id) || []);
+
+      // Transform to match the expected format
+      const transformedProfiles = profilesData?.map((p: any) => ({
+        id: p.id,
+        name: p.display_name,
+        age: p.age,
+        location: p.location || "Nigeria",
+        image: p.profile_image || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + p.id,
+        isLocked: creatorIds.has(p.id),
+        rating: p.rating || 0,
+        price: "₦" + (p.price || 0).toLocaleString(),
+        isOnline: p.is_online || false,
+        coverImage: p.cover_image,
+      })) || [];
+
+      setProfiles(transformedProfiles);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProfiles = profiles.filter(profile => {
     const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       profile.location.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesFilter = selectedFilter === "All" ||
       (selectedFilter === "Online" && profile.isOnline) ||
-      (selectedFilter === "Premium" && parseFloat(profile.price.replace("$", "")) > 25);
+      (selectedFilter === "Premium" && profile.isLocked) ||
+      (selectedFilter === "Free" && !profile.isLocked);
 
     return matchesSearch && matchesFilter;
+  }).sort((a, b) => {
+    // Sort by rating (highest first) and premium status
+    if (selectedFilter === "All") {
+      if (a.isLocked !== b.isLocked) return a.isLocked ? -1 : 1;
+      return b.rating - a.rating;
+    }
+    return b.rating - a.rating;
   });
 
   return (
@@ -269,11 +325,19 @@ const Explore = () => {
           </div>
 
           {/* Profile Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProfiles.map((profile) => (
-              <ProfileItem key={profile.id} profile={profile} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="bg-muted rounded-xl animate-pulse h-64 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProfiles.map((profile) => (
+                <ProfileItem key={profile.id} profile={profile} />
+              ))}
+            </div>
+          )}
 
           {/* Empty State */}
           {filteredProfiles.length === 0 && (
