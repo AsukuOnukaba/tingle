@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Heart, Lock, MapPin, Star } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Heart, Lock, MapPin, Star, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProfileCardProps {
   id: number;
@@ -28,7 +30,25 @@ const ProfileCard = ({
   isOnline = Math.random() > 0.5 
 }: ProfileCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleChat = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to start chatting",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
+
+    // Route to free chat - premium access is determined by subscription status
+    navigate(`/chat/${id}`);
+  };
 
   return (
     <div className="group relative glass-card rounded-2xl overflow-hidden hover:scale-105 transition-smooth hover:neon-glow">
@@ -112,14 +132,11 @@ const ProfileCard = ({
           </Button>
           <Button
             size="sm"
-            onClick={() => setIsSubscribed(!isSubscribed)}
-            className={`flex-1 transition-smooth min-h-[40px] ${
-              isSubscribed 
-                ? "bg-green-600 hover:bg-green-700 text-white" 
-                : "gradient-primary hover:opacity-90 neon-glow"
-            }`}
+            onClick={handleChat}
+            className="flex-1 gradient-primary hover:opacity-90 neon-glow transition-smooth min-h-[40px]"
           >
-            {isSubscribed ? "Subscribed" : "Subscribe"}
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Chat
           </Button>
         </div>
       </div>

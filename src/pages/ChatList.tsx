@@ -152,7 +152,7 @@ const ChatList = () => {
                   <MessageCircle className="h-16 w-16 text-muted-foreground mb-4" />
                   <h3 className="text-xl font-semibold mb-2">No conversations yet</h3>
                   <p className="text-muted-foreground text-center max-w-md">
-                    Start a chat with a creator to see your conversations here
+                    Start chatting to connect with others!
                   </p>
                 </CardContent>
               </Card>
