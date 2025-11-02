@@ -92,15 +92,21 @@ const Profile = () => {
   };
 
   const handleScrollToPricing = () => {
-    const pricingSection = document.getElementById('pricing-section');
-    if (pricingSection) {
-      pricingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // Highlight the section briefly
-      pricingSection.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-      setTimeout(() => {
-        pricingSection.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
-      }, 2000);
-    }
+    // First switch to pricing tab
+    setActiveTab('pricing');
+    
+    // Wait for tab content to render, then scroll and highlight
+    setTimeout(() => {
+      const pricingSection = document.getElementById('pricing-section');
+      if (pricingSection) {
+        pricingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Highlight the section briefly
+        pricingSection.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+        setTimeout(() => {
+          pricingSection.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+        }, 2000);
+      }
+    }, 100);
   };
 
   const handleSubscribe = (tierIndex: number) => {
