@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, MapPin, Calendar, Edit2, Save, X, Upload, Trash2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ const MyProfile = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [showCreatorPrompt, setShowCreatorPrompt] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -575,19 +576,24 @@ const MyProfile = () => {
           <div className="glass-card rounded-3xl p-8 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">My Photos</h2>
-              <label className="cursor-pointer">
-                <Button disabled={uploadingPhoto} className="gradient-primary">
+              <div>
+                <Button 
+                  disabled={uploadingPhoto} 
+                  className="gradient-primary"
+                  onClick={() => photoInputRef.current?.click()}
+                >
                   <Upload className="w-4 h-4 mr-2" />
                   {uploadingPhoto ? "Uploading..." : "Upload Photo"}
                 </Button>
                 <input
+                  ref={photoInputRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
                   onChange={handlePhotoUpload}
                   disabled={uploadingPhoto}
                 />
-              </label>
+              </div>
             </div>
 
             {photos.length > 0 ? (
