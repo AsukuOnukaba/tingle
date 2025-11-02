@@ -11,7 +11,7 @@ import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { PurchaseConfirmationModal } from "@/components/PurchaseConfirmationModal";
+import { SubscriptionModal } from "@/components/SubscriptionModal";
 
 const Profile = () => {
   const { id } = useParams();
@@ -20,35 +20,16 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState("photos");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [selectedTier, setSelectedTier] = useState(1);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(0);
+  const [subscriptionExpiry, setSubscriptionExpiry] = useState<Date | null>(null);
 
   const profile = getProfile(Number(id));
 
   useEffect(() => {
     setCurrentProfileId(id || "1");
     checkSubscription();
-    fetchWalletBalance();
   }, [id, setCurrentProfileId]);
-
-  const fetchWalletBalance = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('user_wallets')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (data && !error) {
-        setWalletBalance(data.balance);
-      }
-    } catch (error) {
-      console.error('Error fetching wallet balance:', error);
-    }
-  };
 
   const checkSubscription = async () => {
     if (!user) return;
@@ -56,57 +37,54 @@ const Profile = () => {
     try {
       const { data, error } = await (supabase as any)
         .from('subscriptions')
-        .select('*')
+        .select('*, expires_at')
         .eq('subscriber_id', user.id)
-        .eq('creator_id', id)
         .eq('is_active', true)
         .maybeSingle();
 
       if (data && !error) {
-        setIsSubscribed(true);
+        const expiryDate = new Date(data.expires_at);
+        const now = new Date();
+        
+        // Check if subscription has expired
+        if (expiryDate < now) {
+          // Deactivate expired subscription
+          await (supabase as any)
+            .from('subscriptions')
+            .update({ is_active: false })
+            .eq('id', data.id);
+          
+          setIsSubscribed(false);
+          setSubscriptionExpiry(null);
+          toast.error("Your subscription has expired. You've been moved to the Basic plan.");
+        } else {
+          setIsSubscribed(true);
+          setSubscriptionExpiry(expiryDate);
+        }
+      } else {
+        setIsSubscribed(false);
+        setSubscriptionExpiry(null);
       }
     } catch (error) {
       console.error('Error checking subscription:', error);
     }
   };
 
-  const handleSubscribe = () => {
+  const handleSubscribe = (tierIndex: number) => {
     if (!user) {
       toast.error("Please login to subscribe");
       return;
     }
-    // Navigate to subscription plans page
-    window.location.href = `/subscription/${id}`;
+    const tier = profile.tiers[tierIndex];
+    if (tier.price === "Free") {
+      return; // Don't open modal for free tier
+    }
+    setSelectedTier(tierIndex);
+    setShowSubscriptionModal(true);
   };
 
-  const handleSubscriptionPurchase = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    try {
-      const selectedTierData = profile.tiers[selectedTier];
-
-      // Process subscription
-      const { error: subError } = await (supabase as any)
-        .from('subscriptions')
-        .insert({
-          subscriber_id: user.id,
-          creator_id: id,
-          is_active: true,
-        });
-
-      if (subError) throw subError;
-
-      setIsSubscribed(true);
-      toast.success(`Successfully subscribed to ${profile.name}!`);
-      setShowPurchaseModal(false);
-      fetchWalletBalance();
-    } catch (error: any) {
-      console.error('Subscription error:', error);
-      toast.error(error.message || "Failed to process subscription");
-    } finally {
-      setLoading(false);
-    }
+  const handleSubscriptionSuccess = () => {
+    checkSubscription();
   };
 
   const handleUnsubscribe = async () => {
@@ -224,13 +202,18 @@ const Profile = () => {
                     </Button>
                   ) : (
                     <Button 
-                      onClick={handleSubscribe}
+                      onClick={() => handleSubscribe(1)}
                       disabled={loading}
                       className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
                     >
                       <Heart className="w-4 h-4 mr-2" />
                       Subscribe
                     </Button>
+                  )}
+                  {subscriptionExpiry && isSubscribed && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Expires: {subscriptionExpiry.toLocaleDateString()}
+                    </p>
                   )}
                 </div>
               </div>
@@ -320,7 +303,7 @@ const Profile = () => {
                     <p className="text-sm text-muted-foreground mb-4">Subscribe to see {profile.posts}+ exclusive photos and videos</p>
                     <Button 
                       size="sm" 
-                      onClick={handleSubscribe}
+                      onClick={() => handleSubscribe(1)}
                       disabled={loading}
                       className="gradient-primary hover:opacity-90 transition-smooth"
                     >
@@ -393,18 +376,15 @@ const Profile = () => {
                         ))}
                       </ul>
                       <Button
-                        onClick={() => {
-                          setSelectedTier(index);
-                          if (!isSubscribed && tier.price !== "Free") handleSubscribe();
-                        }}
-                        disabled={loading || (tier.price === "Free")}
+                        onClick={() => handleSubscribe(index)}
+                        disabled={loading || (tier.price === "Free") || (isSubscribed && selectedTier === index)}
                         className={`w-full transition-smooth ${
-                          selectedTier === index && isSubscribed
+                          isSubscribed && selectedTier === index
                             ? "gradient-primary hover:opacity-90 neon-glow"
-                            : "variant-outline bg-muted/50 border-border/50 hover:bg-muted"
+                            : "bg-muted/50 border-border/50 hover:bg-muted"
                         }`}
                       >
-                        {tier.price === "Free" ? "Free Access" : (selectedTier === index && isSubscribed ? "Current Plan" : "Choose Plan")}
+                        {tier.price === "Free" ? "Free Access" : (isSubscribed && selectedTier === index ? "Current Plan" : "Choose Plan")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -415,14 +395,13 @@ const Profile = () => {
         </div>
       </div>
 
-      <PurchaseConfirmationModal
-        isOpen={showPurchaseModal}
-        onClose={() => setShowPurchaseModal(false)}
-        contentId={id || ""}
-        contentTitle={`${profile.name} - ${profile.tiers[selectedTier].name} Subscription`}
-        price={parseFloat(profile.tiers[selectedTier].price.replace('$', ''))}
-        walletBalance={walletBalance}
-        onPurchaseSuccess={handleSubscriptionPurchase}
+      <SubscriptionModal
+        isOpen={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        plan={profile.tiers[selectedTier]}
+        creatorId={id || ""}
+        creatorName={profile.name}
+        onSuccess={handleSubscriptionSuccess}
       />
     </div>
   );
