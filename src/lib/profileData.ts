@@ -49,7 +49,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$24.99",
     photos: [profile1, profile2, profile3],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$24.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$49.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -69,7 +69,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$19.99",
     photos: [profile2, profile1, profile3],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$19.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$39.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -89,7 +89,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$29.99",
     photos: [profile3, profile2, profile1],
     tiers: [
-      { name: "Basic", price: "$14.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$29.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$59.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -109,7 +109,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$22.99",
     photos: [profile4, profile1, profile2],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$22.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$44.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -129,7 +129,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$34.99",
     photos: [profile5, profile2, profile3],
     tiers: [
-      { name: "Basic", price: "$14.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$34.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$69.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -149,7 +149,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$18.99",
     photos: [profile6, profile1, profile2],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$18.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$37.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -169,7 +169,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$27.99",
     photos: [profile7, profile2, profile3],
     tiers: [
-      { name: "Basic", price: "$12.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$27.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$54.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -189,7 +189,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$21.99",
     photos: [profile8, profile1, profile2],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$21.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$43.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -209,7 +209,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$32.99",
     photos: [profile9, profile2, profile3],
     tiers: [
-      { name: "Basic", price: "$14.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$32.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$64.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -229,7 +229,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$20.99",
     photos: [profile10, profile1, profile2],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$20.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$41.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -249,7 +249,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$26.99",
     photos: [profile11, profile2, profile3],
     tiers: [
-      { name: "Basic", price: "$12.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$26.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$52.99", features: ["All content", "Video calls", "Personal attention"] },
     ]
@@ -269,7 +269,7 @@ export const profiles: Record<number, Profile> = {
     subscriptionPrice: "$23.99",
     photos: [profile12, profile1, profile2],
     tiers: [
-      { name: "Basic", price: "$9.99", features: ["Weekly photos", "Basic chat access"] },
+      { name: "Basic", price: "Free", features: ["Weekly photos", "Basic chat access"] },
       { name: "Premium", price: "$23.99", features: ["Daily content", "Priority messages", "Custom requests"] },
       { name: "VIP", price: "$47.99", features: ["All content", "Video calls", "Personal attention"] },
     ]

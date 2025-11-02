@@ -378,7 +378,12 @@ const Profile = () => {
                     <CardContent className="p-6 text-center">
                       <h3 className="text-xl font-semibold mb-2">{tier.name}</h3>
                       <div className="text-3xl font-bold text-primary mb-4">{tier.price}</div>
-                      <div className="text-sm text-muted-foreground mb-6">per month</div>
+                      {tier.price !== "Free" && (
+                        <div className="text-sm text-muted-foreground mb-6">per month</div>
+                      )}
+                      {tier.price === "Free" && (
+                        <div className="text-sm text-muted-foreground mb-6">Always free</div>
+                      )}
                       <ul className="space-y-2 text-sm text-muted-foreground mb-6">
                         {tier.features.map((feature, featureIndex) => (
                           <li key={featureIndex} className="flex items-center">
@@ -390,16 +395,16 @@ const Profile = () => {
                       <Button
                         onClick={() => {
                           setSelectedTier(index);
-                          if (!isSubscribed) handleSubscribe();
+                          if (!isSubscribed && tier.price !== "Free") handleSubscribe();
                         }}
-                        disabled={loading}
+                        disabled={loading || (tier.price === "Free")}
                         className={`w-full transition-smooth ${
                           selectedTier === index && isSubscribed
                             ? "gradient-primary hover:opacity-90 neon-glow"
                             : "variant-outline bg-muted/50 border-border/50 hover:bg-muted"
                         }`}
                       >
-                        {selectedTier === index && isSubscribed ? "Current Plan" : "Choose Plan"}
+                        {tier.price === "Free" ? "Free Access" : (selectedTier === index && isSubscribed ? "Current Plan" : "Choose Plan")}
                       </Button>
                     </CardContent>
                   </Card>
