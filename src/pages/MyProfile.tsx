@@ -172,6 +172,20 @@ const MyProfile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // Moderate image file
+    const { moderateImageFile } = await import("@/lib/contentModeration");
+    const moderation = moderateImageFile(file);
+    
+    if (!moderation.isAllowed) {
+      toast.error(moderation.warnings.join(". "));
+      return;
+    }
+
+    // Show content policy reminder
+    if (moderation.warnings.length > 0) {
+      toast.warning(moderation.warnings[0], { duration: 5000 });
+    }
+
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${type}-${Date.now()}.${fileExt}`;
@@ -205,6 +219,20 @@ const MyProfile = () => {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+
+    // Moderate image file
+    const { moderateImageFile } = await import("@/lib/contentModeration");
+    const moderation = moderateImageFile(file);
+    
+    if (!moderation.isAllowed) {
+      toast.error(moderation.warnings.join(". "));
+      return;
+    }
+
+    // Show content policy reminder
+    if (moderation.warnings.length > 0) {
+      toast.warning(moderation.warnings[0], { duration: 5000 });
+    }
 
     setUploadingPhoto(true);
     try {
@@ -330,16 +358,21 @@ const MyProfile = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 )}
                 {isEditing && (
-                  <label className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm text-foreground px-4 py-2 rounded-lg cursor-pointer hover:bg-background transition-smooth z-10">
-                    <Camera className="w-4 h-4 inline mr-2" />
-                    Change Cover
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleImageUpload(e, "cover")}
-                    />
-                  </label>
+                  <div className="space-y-2">
+                    <label className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm text-foreground px-4 py-2 rounded-lg cursor-pointer hover:bg-background transition-smooth z-10">
+                      <Camera className="w-4 h-4 inline mr-2" />
+                      Change Cover
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e, "cover")}
+                      />
+                    </label>
+                    <p className="absolute top-16 left-4 text-xs text-white bg-black/60 backdrop-blur-sm px-3 py-1 rounded-md z-10">
+                      Recommended: 1500x500px (3:1 ratio)
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -573,7 +606,7 @@ const MyProfile = () => {
                       </div>
                       {photo.is_premium && (
                         <Badge className="bg-primary text-xs">
-                          ${photo.price}
+                          ₦{(photo.price * 1600).toLocaleString()}
                         </Badge>
                       )}
                     </div>

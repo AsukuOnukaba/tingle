@@ -16,6 +16,7 @@ interface ProfileCardProps {
   rating?: number;
   price?: string;
   isOnline?: boolean;
+  isCreator?: boolean;
 }
 
 const ProfileCard = ({ 
@@ -26,8 +27,9 @@ const ProfileCard = ({
   image, 
   isLocked = true, 
   rating = 4.8,
-  price = "$19.99",
-  isOnline = Math.random() > 0.5 
+  price,
+  isOnline = Math.random() > 0.5,
+  isCreator = false
 }: ProfileCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const navigate = useNavigate();
@@ -114,10 +116,12 @@ const ProfileCard = ({
               {location}
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-primary font-semibold">{price}</div>
-            <div className="text-xs text-gray-400">per month</div>
-          </div>
+          {isCreator && price && (
+            <div className="text-right">
+              <div className="text-primary font-semibold">{price}</div>
+              <div className="text-xs text-gray-400">per month</div>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
