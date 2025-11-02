@@ -1,17 +1,37 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Camera, MapPin, Calendar, Edit2, Save, X } from "lucide-react";
+import { Camera, MapPin, Calendar, Edit2, Save, X, Upload, Trash2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import Navigation from "@/components/Navigation";
 import { BecomeCreatorButton } from "@/integrations/components/BecomeCreatorButton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
 import { toast } from "sonner";
+
+interface UserPhoto {
+  id: string;
+  file_url: string;
+  thumbnail_url?: string;
+  caption?: string;
+  is_premium: boolean;
+  price: number;
+  created_at: string;
+}
 
 const MyProfile = () => {
   const navigate = useNavigate();
@@ -25,7 +45,12 @@ const MyProfile = () => {
     location: "",
     bio: "",
     profile_image: "",
+    cover_image: "",
   });
+  const [photos, setPhotos] = useState<UserPhoto[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showCreatorPrompt, setShowCreatorPrompt] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -35,6 +60,7 @@ const MyProfile = () => {
     
     if (user) {
       fetchProfile();
+      fetchPhotos();
     }
   }, [user, authLoading, navigate]);
 
@@ -57,6 +83,7 @@ const MyProfile = () => {
           location: data.location || "",
           bio: data.bio || "",
           profile_image: data.profile_image || "",
+          cover_image: data.cover_image || "",
         });
       } else {
         // Create profile if it doesn't exist
@@ -79,12 +106,30 @@ const MyProfile = () => {
             location: "",
             bio: "",
             profile_image: "",
+            cover_image: "",
           });
         }
       }
     } catch (error: any) {
       console.error("Error fetching profile:", error);
       toast.error("Failed to load profile");
+    }
+  };
+
+  const fetchPhotos = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from("user_photos")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setPhotos(data || []);
+    } catch (error: any) {
+      console.error("Error fetching photos:", error);
     }
   };
 
@@ -106,6 +151,7 @@ const MyProfile = () => {
           location: profile.location || null,
           bio: profile.bio || null,
           profile_image: profile.profile_image || null,
+          cover_image: profile.cover_image || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);
@@ -122,30 +168,133 @@ const MyProfile = () => {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: "profile" | "cover") => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      const fileName = `${user.id}/${type}-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("media-content")
-        .upload(filePath, file);
+        .from("profile-images")
+        .upload(fileName, file, {
+          upsert: true,
+          cacheControl: '3600',
+        });
 
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage
-        .from("media-content")
-        .getPublicUrl(filePath);
+        .from("profile-images")
+        .getPublicUrl(fileName);
 
-      setProfile({ ...profile, profile_image: data.publicUrl });
-      toast.success("Image uploaded successfully!");
+      if (type === "profile") {
+        setProfile({ ...profile, profile_image: data.publicUrl });
+      } else {
+        setProfile({ ...profile, cover_image: data.publicUrl });
+      }
+      
+      toast.success(`${type === "profile" ? "Profile" : "Cover"} image uploaded successfully!`);
     } catch (error: any) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/photo-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("user-photos")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("user-photos")
+        .getPublicUrl(fileName);
+
+      const { error: insertError } = await (supabase as any)
+        .from("user_photos")
+        .insert({
+          user_id: user.id,
+          file_url: urlData.publicUrl,
+          is_premium: false,
+          price: 0,
+        });
+
+      if (insertError) throw insertError;
+
+      toast.success("Photo uploaded successfully!");
+      fetchPhotos();
+    } catch (error: any) {
+      console.error("Error uploading photo:", error);
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: string, fileUrl: string) => {
+    try {
+      // Extract file path from URL
+      const urlParts = fileUrl.split("/user-photos/");
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1].split("?")[0];
+        
+        // Delete from storage
+        await supabase.storage
+          .from("user-photos")
+          .remove([filePath]);
+      }
+
+      // Delete from database
+      const { error } = await (supabase as any)
+        .from("user_photos")
+        .delete()
+        .eq("id", photoId);
+
+      if (error) throw error;
+
+      toast.success("Photo deleted successfully!");
+      fetchPhotos();
+    } catch (error: any) {
+      console.error("Error deleting photo:", error);
+      toast.error("Failed to delete photo");
+    } finally {
+      setPhotoToDelete(null);
+    }
+  };
+
+  const handleTogglePremium = async (photoId: string, currentStatus: boolean) => {
+    if (!currentStatus && !isCreator) {
+      setShowCreatorPrompt(true);
+      return;
+    }
+
+    try {
+      const { error } = await (supabase as any)
+        .from("user_photos")
+        .update({
+          is_premium: !currentStatus,
+          price: !currentStatus ? 10 : 0, // Default price of 10 for premium
+        })
+        .eq("id", photoId);
+
+      if (error) throw error;
+
+      toast.success(`Photo marked as ${!currentStatus ? "premium" : "free"}`);
+      fetchPhotos();
+    } catch (error: any) {
+      console.error("Error updating photo:", error);
+      toast.error("Failed to update photo");
     }
   };
 
@@ -170,15 +319,28 @@ const MyProfile = () => {
           <div className="glass-card rounded-3xl overflow-hidden mb-8 animate-fade-up">
             <div className="relative">
               {/* Cover Image */}
-              <div className="h-48 md:h-64 bg-gradient-to-r from-primary/20 to-secondary/20 relative overflow-hidden">
-                {profile.profile_image && (
+              <div className="h-48 md:h-64 bg-gradient-to-r from-primary/20 to-secondary/20 relative overflow-hidden group">
+                {profile.cover_image ? (
                   <img
-                    src={profile.profile_image}
+                    src={profile.cover_image}
                     alt="Cover"
-                    className="w-full h-full object-cover opacity-30"
+                    className="w-full h-full object-cover"
                   />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                {isEditing && (
+                  <label className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm text-foreground px-4 py-2 rounded-lg cursor-pointer hover:bg-background transition-smooth opacity-0 group-hover:opacity-100">
+                    <Camera className="w-4 h-4 inline mr-2" />
+                    Change Cover
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleImageUpload(e, "cover")}
+                    />
+                  </label>
+                )}
               </div>
 
               {/* Profile Picture */}
@@ -204,7 +366,7 @@ const MyProfile = () => {
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={handleImageUpload}
+                        onChange={(e) => handleImageUpload(e, "profile")}
                       />
                     </label>
                   )}
@@ -356,8 +518,121 @@ const MyProfile = () => {
               )}
             </div>
           </div>
+
+          {/* Photo Gallery */}
+          <div className="glass-card rounded-3xl p-8 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">My Photos</h2>
+              <label className="cursor-pointer">
+                <Button disabled={uploadingPhoto} className="gradient-primary">
+                  <Upload className="w-4 h-4 mr-2" />
+                  {uploadingPhoto ? "Uploading..." : "Upload Photo"}
+                </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                  disabled={uploadingPhoto}
+                />
+              </label>
+            </div>
+
+            {photos.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {photos.map((photo) => (
+                  <div
+                    key={photo.id}
+                    className="relative aspect-square rounded-xl overflow-hidden group bg-muted"
+                  >
+                    <img
+                      src={photo.file_url}
+                      alt={photo.caption || "User photo"}
+                      className="w-full h-full object-cover"
+                    />
+                    
+                    {/* Overlay with actions */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-smooth flex flex-col items-center justify-center gap-2 p-2">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={photo.is_premium ? "default" : "outline"}
+                          onClick={() => handleTogglePremium(photo.id, photo.is_premium)}
+                          className="text-xs"
+                        >
+                          <Lock className="w-3 h-3 mr-1" />
+                          {photo.is_premium ? "Premium" : "Free"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setPhotoToDelete(photo.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      {photo.is_premium && (
+                        <Badge className="bg-primary text-xs">
+                          ${photo.price}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <Upload className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">No photos yet</p>
+                <p className="text-sm">Upload your first photo to get started!</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Creator Prompt Dialog */}
+      <AlertDialog open={showCreatorPrompt} onOpenChange={setShowCreatorPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Become a Creator</AlertDialogTitle>
+            <AlertDialogDescription>
+              You need to be an approved creator to mark photos as premium content. 
+              Would you like to apply to become a creator?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <BecomeCreatorButton />
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!photoToDelete} onOpenChange={() => setPhotoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this photo? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const photo = photos.find(p => p.id === photoToDelete);
+                if (photo) handleDeletePhoto(photo.id, photo.file_url);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
