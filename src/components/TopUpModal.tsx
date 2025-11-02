@@ -63,7 +63,7 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
       // NOTE: This is a test key. In production, move to environment variable:
       // VITE_PAYSTACK_PUBLIC_KEY in .env file
       const handler = globalThis.PaystackPop.setup({
-        key: 'pk_test_a06de080285d9edc4dd0f8f09314071b7c6af4a0',
+        key: 'pk_live_acee15f7955261c2f143e862b128dbd2de4343ac',
         email: user.email,
         amount: amountValue * 100, // kobo
         ref: reference,
