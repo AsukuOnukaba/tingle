@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,213 +7,8 @@ import ProfileCard from "@/components/ProfileCard";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useInView } from 'react-intersection-observer';
-
-// Import profile images
-import profile1 from "@/assets/profiles/profile-1.jpg";
-import profile2 from "@/assets/profiles/profile-2.jpg";
-import profile3 from "@/assets/profiles/profile-3.jpg";
-import profile4 from "@/assets/profiles/profile-4.jpg";
-import profile5 from "@/assets/profiles/profile-5.jpg";
-import profile6 from "@/assets/profiles/profile-6.jpg";
-import profile7 from "@/assets/profiles/profile-7.jpg";
-import profile8 from "@/assets/profiles/profile-8.jpg";
-import profile9 from "@/assets/profiles/profile-9.jpg";
-import profile10 from "@/assets/profiles/profile-10.jpg";
-import profile11 from "@/assets/profiles/profile-11.jpg";
-import profile12 from "@/assets/profiles/profile-12.jpg";
-
-const fakeProfiles = [
-  // Premium/Creator Profiles (with prices in Naira)
-  {
-    id: 1,
-    name: "Emmanuel",
-    age: 25,
-    location: "Lagos, Nigeria",
-    image: profile1,
-    isLocked: true,
-    rating: 4.9,
-    price: "₦39,999",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 2,
-    name: "Jane",
-    age: 28,
-    location: "Abuja, Nigeria",
-    image: profile2,
-    isLocked: true,
-    rating: 4.7,
-    price: "₦31,999",
-    isOnline: false,
-    isCreator: true,
-  },
-  {
-    id: 3,
-    name: "Sophia",
-    age: 24,
-    location: "Port Harcourt, Nigeria",
-    image: profile3,
-    isLocked: true,
-    rating: 4.8,
-    price: "₦47,999",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 4,
-    name: "Marcus",
-    age: 26,
-    location: "Ibadan, Nigeria",
-    image: profile4,
-    isLocked: true,
-    rating: 4.6,
-    price: "₦36,799",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 5,
-    name: "Zara",
-    age: 27,
-    location: "Kano, Nigeria",
-    image: profile5,
-    isLocked: true,
-    rating: 4.9,
-    price: "₦55,999",
-    isOnline: false,
-    isCreator: true,
-  },
-  {
-    id: 6,
-    name: "Ryan",
-    age: 29,
-    location: "Benin City, Nigeria",
-    image: profile6,
-    isLocked: true,
-    rating: 4.5,
-    price: "₦30,399",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 7,
-    name: "Lucky",
-    age: 24,
-    location: "Enugu, Nigeria",
-    image: profile7,
-    isLocked: true,
-    rating: 4.8,
-    price: "₦44,799",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 8,
-    name: "Alex",
-    age: 26,
-    location: "Calabar, Nigeria",
-    image: profile8,
-    isLocked: true,
-    rating: 4.7,
-    price: "₦35,199",
-    isOnline: false,
-    isCreator: true,
-  },
-  {
-    id: 9,
-    name: "Maya",
-    age: 23,
-    location: "Jos, Nigeria",
-    image: profile9,
-    isLocked: true,
-    rating: 4.9,
-    price: "₦52,799",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 10,
-    name: "Tyler",
-    age: 28,
-    location: "Owerri, Nigeria",
-    image: profile10,
-    isLocked: true,
-    rating: 4.6,
-    price: "₦33,599",
-    isOnline: true,
-    isCreator: true,
-  },
-  {
-    id: 11,
-    name: "Ruby",
-    age: 25,
-    location: "Warri, Nigeria",
-    image: profile11,
-    isLocked: true,
-    rating: 4.8,
-    price: "₦43,199",
-    isOnline: false,
-    isCreator: true,
-  },
-  {
-    id: 12,
-    name: "Devon",
-    age: 27,
-    location: "Kaduna, Nigeria",
-    image: profile12,
-    isLocked: true,
-    rating: 4.7,
-    price: "₦38,399",
-    isOnline: true,
-    isCreator: true,
-  },
-  // Free/Non-Creator Profiles (no price)
-  {
-    id: 13,
-    name: "Chioma",
-    age: 22,
-    location: "Lagos, Nigeria",
-    image: profile1,
-    isLocked: false,
-    rating: 4.5,
-    isOnline: true,
-    isCreator: false,
-  },
-  {
-    id: 14,
-    name: "Tunde",
-    age: 26,
-    location: "Abuja, Nigeria",
-    image: profile4,
-    isLocked: false,
-    rating: 4.6,
-    isOnline: false,
-    isCreator: false,
-  },
-  {
-    id: 15,
-    name: "Amara",
-    age: 24,
-    location: "Port Harcourt, Nigeria",
-    image: profile3,
-    isLocked: false,
-    rating: 4.4,
-    isOnline: true,
-    isCreator: false,
-  },
-  {
-    id: 16,
-    name: "Segun",
-    age: 28,
-    location: "Ibadan, Nigeria",
-    image: profile6,
-    isLocked: false,
-    rating: 4.7,
-    isOnline: true,
-    isCreator: false,
-  },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useOptimizedQuery } from "@/hooks/useOptimizedQuery";
 
 const ProfileItem = ({ profile }) => {
   const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.1 });
@@ -232,16 +27,28 @@ const Explore = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("All");
 
-  const filters = ["All", "Online", "New", "Premium", "Free"];
+  const filters = ["All", "Online", "Premium"];
 
-  const filteredProfiles = fakeProfiles.filter(profile => {
-    const matchesSearch = profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      profile.location.toLowerCase().includes(searchTerm.toLowerCase());
+  const { data: profiles = [], isLoading } = useOptimizedQuery(
+    'explore-profiles',
+    async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name, age, location, profile_image, is_online, rating, price')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  );
+
+  const filteredProfiles = profiles.filter(profile => {
+    const matchesSearch = profile.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      profile.location?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesFilter = selectedFilter === "All" ||
-      (selectedFilter === "Online" && profile.isOnline) ||
-      (selectedFilter === "Premium" && profile.isCreator) ||
-      (selectedFilter === "Free" && !profile.isCreator);
+      (selectedFilter === "Online" && profile.is_online) ||
+      (selectedFilter === "Premium" && profile.price && profile.price > 0);
 
     return matchesSearch && matchesFilter;
   });
@@ -328,11 +135,32 @@ const Explore = () => {
           </div>
 
           {/* Profile Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProfiles.map((profile) => (
-              <ProfileItem key={profile.id} profile={profile} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="bg-muted rounded-xl animate-pulse h-64 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProfiles.map((profile) => (
+                <ProfileItem 
+                  key={profile.id} 
+                  profile={{
+                    id: profile.id,
+                    name: profile.display_name,
+                    age: profile.age,
+                    location: profile.location || 'Unknown',
+                    image: profile.profile_image,
+                    isOnline: profile.is_online,
+                    rating: profile.rating,
+                    price: profile.price > 0 ? `₦${(profile.price * 1600).toLocaleString()}` : undefined,
+                    isCreator: profile.price && profile.price > 0,
+                  }} 
+                />
+              ))}
+            </div>
+          )}
 
           {/* Empty State */}
           {filteredProfiles.length === 0 && (
