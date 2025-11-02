@@ -23,13 +23,34 @@ const Profile = () => {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [subscriptionExpiry, setSubscriptionExpiry] = useState<Date | null>(null);
+  const [creatorId, setCreatorId] = useState<string | null>(null);
 
   const profile = getProfile(Number(id));
 
   useEffect(() => {
     setCurrentProfileId(id || "1");
     checkSubscription();
-  }, [id, setCurrentProfileId]);
+    if (profile) {
+      fetchCreatorId(profile.id);
+    }
+  }, [id, setCurrentProfileId, profile]);
+
+  const fetchCreatorId = async (profileId: number) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('creators')
+        .select('id')
+        .eq('user_id', String(profileId))
+        .eq('status', 'approved')
+        .maybeSingle();
+
+      if (data && !error) {
+        setCreatorId(data.id);
+      }
+    } catch (error) {
+      console.error('Error fetching creator:', error);
+    }
+  };
 
   const checkSubscription = async () => {
     if (!user) return;
@@ -70,9 +91,25 @@ const Profile = () => {
     }
   };
 
+  const handleScrollToPricing = () => {
+    const pricingSection = document.getElementById('pricing-section');
+    if (pricingSection) {
+      pricingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Highlight the section briefly
+      pricingSection.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+      setTimeout(() => {
+        pricingSection.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+      }, 2000);
+    }
+  };
+
   const handleSubscribe = (tierIndex: number) => {
     if (!user) {
       toast.error("Please login to subscribe");
+      return;
+    }
+    if (!creatorId) {
+      toast.error("Creator profile not found");
       return;
     }
     const tier = profile.tiers[tierIndex];
@@ -202,7 +239,7 @@ const Profile = () => {
                     </Button>
                   ) : (
                     <Button 
-                      onClick={() => handleSubscribe(1)}
+                      onClick={handleScrollToPricing}
                       disabled={loading}
                       className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
                     >
@@ -210,12 +247,12 @@ const Profile = () => {
                       Subscribe
                     </Button>
                   )}
-                  {subscriptionExpiry && isSubscribed && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Expires: {subscriptionExpiry.toLocaleDateString()}
-                    </p>
-                  )}
                 </div>
+                {subscriptionExpiry && isSubscribed && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Expires: {subscriptionExpiry.toLocaleDateString()}
+                  </p>
+                )}
               </div>
 
               {/* Stats */}
@@ -349,7 +386,7 @@ const Profile = () => {
             </TabsContent>
 
             <TabsContent value="pricing">
-              <div className="grid gap-6 md:grid-cols-3">
+              <div id="pricing-section" className="grid gap-6 md:grid-cols-3 transition-all duration-300">
                 {profile.tiers.map((tier, index) => (
                   <Card
                     key={tier.name}
@@ -395,14 +432,16 @@ const Profile = () => {
         </div>
       </div>
 
-      <SubscriptionModal
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-        plan={profile.tiers[selectedTier]}
-        creatorId={id || ""}
-        creatorName={profile.name}
-        onSuccess={handleSubscriptionSuccess}
-      />
+      {creatorId && (
+        <SubscriptionModal
+          isOpen={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+          plan={profile.tiers[selectedTier]}
+          creatorId={creatorId}
+          creatorName={profile.name}
+          onSuccess={handleSubscriptionSuccess}
+        />
+      )}
     </div>
   );
 };

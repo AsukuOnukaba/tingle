@@ -125,7 +125,7 @@ export const SubscriptionModal = ({
     try {
       const reference = `SUB-${Date.now()}-${user.id.slice(0, 8)}`;
 
-      // Create payment intent
+      // Create payment intent (no need to store plan_id since we're using creator_id)
       const { error: intentError } = await (supabase as any)
         .from("payment_intents")
         .insert({

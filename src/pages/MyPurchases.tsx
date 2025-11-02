@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Image as ImageIcon, Video } from "lucide-react";
+import { ArrowLeft, Download, Image as ImageIcon, Video, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,8 +26,23 @@ interface Purchase {
   };
 }
 
+interface Subscription {
+  id: string;
+  amount_paid: number;
+  created_at: string;
+  expires_at: string;
+  is_active: boolean;
+  creator: {
+    display_name: string;
+    bio: string;
+  };
+  plan_name: string;
+}
+
 const MyPurchases = () => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [activeTab, setActiveTab] = useState<"purchases" | "subscriptions">("purchases");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -34,6 +50,7 @@ const MyPurchases = () => {
   useEffect(() => {
     if (user) {
       fetchPurchases();
+      fetchSubscriptions();
     }
   }, [user]);
 
@@ -85,6 +102,61 @@ const MyPurchases = () => {
     }
   };
 
+  const fetchSubscriptions = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('subscriptions')
+        .select(`
+          id,
+          amount_paid,
+          created_at,
+          expires_at,
+          is_active,
+          creator_id
+        `)
+        .eq('subscriber_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch creator details for each subscription
+      const subsWithCreators = await Promise.all(
+        (data || []).map(async (sub: any) => {
+          const { data: creatorData } = await (supabase as any)
+            .from('creators')
+            .select('display_name, bio, user_id')
+            .eq('id', sub.creator_id)
+            .single();
+
+          // Fetch profile for creator
+          const { data: profileData } = await (supabase as any)
+            .from('profiles')
+            .select('display_name')
+            .eq('id', creatorData?.user_id)
+            .single();
+
+          return {
+            ...sub,
+            creator: {
+              display_name: profileData?.display_name || creatorData?.display_name || 'Unknown Creator',
+              bio: creatorData?.bio || ''
+            },
+            plan_name: 'Premium Subscription'
+          };
+        })
+      );
+
+      setSubscriptions(subsWithCreators);
+    } catch (error: any) {
+      console.error('Error fetching subscriptions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load subscriptions",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDownload = (url: string, title: string) => {
     const link = document.createElement("a");
     link.href = url;
@@ -132,8 +204,8 @@ const MyPurchases = () => {
             </div>
           </div>
 
-          {/* Purchases Grid */}
-          {purchases.length === 0 ? (
+          {/* Content Based on Active Tab */}
+          {activeTab === "purchases" && purchases.length === 0 ? (
             <div className="text-center py-12 animate-fade-up">
               <div className="w-16 h-16 rounded-full bg-muted mx-auto flex items-center justify-center mb-4">
                 <ImageIcon className="w-8 h-8 text-muted-foreground" />
@@ -146,7 +218,20 @@ const MyPurchases = () => {
                 <Link to="/explore">Explore Content</Link>
               </Button>
             </div>
-          ) : (
+          ) : activeTab === "subscriptions" && subscriptions.length === 0 ? (
+            <div className="text-center py-12 animate-fade-up">
+              <div className="w-16 h-16 rounded-full bg-muted mx-auto flex items-center justify-center mb-4">
+                <ShoppingBag className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">No Active Subscriptions</h3>
+              <p className="text-muted-foreground mb-6">
+                Subscribe to your favorite creators to unlock exclusive content
+              </p>
+              <Button asChild className="gradient-primary">
+                <Link to="/explore">Browse Creators</Link>
+              </Button>
+            </div>
+          ) : activeTab === "purchases" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {purchases.map((purchase, index) => (
                 <Card
@@ -210,6 +295,54 @@ const MyPurchases = () => {
                       </Button>
                     </div>
                   </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {subscriptions.map((subscription) => (
+              <Card key={subscription.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <CardContent className="p-6 space-y-4">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">
+                      {subscription.creator.display_name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {subscription.creator.bio || 'Premium subscription access'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <Badge variant={subscription.is_active ? "default" : "secondary"}>
+                        {subscription.is_active ? "Active" : "Expired"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Amount Paid</span>
+                      <span className="font-semibold">₦{subscription.amount_paid.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Started</span>
+                      <span>{new Date(subscription.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        {subscription.is_active ? "Expires" : "Expired"}
+                      </span>
+                      <span>{new Date(subscription.expires_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  {subscription.is_active && (
+                    <div className="pt-4 border-t">
+                      <p className="text-xs text-muted-foreground text-center">
+                        Auto-renews on {new Date(subscription.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
                 </Card>
               ))}
             </div>
