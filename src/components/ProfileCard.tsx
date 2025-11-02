@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProfileCardProps {
-  id: number;
+  id: string;
   name: string;
   age: number;
   location: string;
