@@ -330,7 +330,7 @@ const MyProfile = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 )}
                 {isEditing && (
-                  <label className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm text-foreground px-4 py-2 rounded-lg cursor-pointer hover:bg-background transition-smooth opacity-0 group-hover:opacity-100">
+                  <label className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm text-foreground px-4 py-2 rounded-lg cursor-pointer hover:bg-background transition-smooth z-10">
                     <Camera className="w-4 h-4 inline mr-2" />
                     Change Cover
                     <input
