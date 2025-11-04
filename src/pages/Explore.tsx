@@ -23,6 +23,9 @@ interface ProfileData {
   rating: number | null;
   is_online: boolean | null;
   created_at: string | null;
+  creators: {
+    status: string;
+  } | null;
 }
 
 const ProfileItem = ({ profile }) => {
@@ -50,7 +53,7 @@ const Explore = () => {
     async () => {
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at")
+        .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at, creators(status)")
         .order("rating", { ascending: false })
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -65,7 +68,7 @@ const Explore = () => {
         profile.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         profile.location?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const isCreator = profile.price && Number(profile.price) > 0;
+      const isCreator = profile.creators?.status === 'approved';
       
       const matchesFilter = 
         selectedFilter === "All" ||
@@ -76,9 +79,9 @@ const Explore = () => {
       return matchesSearch && matchesFilter;
     })
     .map((profile) => {
-      const isCreator = profile.price && Number(profile.price) > 0;
-      // Only show price for creator profiles AND when not on the "Free" filter
-      const showPrice = isCreator && selectedFilter !== "Free";
+      const isCreator = profile.creators?.status === 'approved';
+      // Only show price for approved creators AND when not on the "Free" filter
+      const showPrice = isCreator && selectedFilter !== "Free" && profile.price && Number(profile.price) > 0;
       
       return {
         id: profile.id,
