@@ -75,20 +75,24 @@ const Explore = () => {
 
       return matchesSearch && matchesFilter;
     })
-    .map((profile) => ({
-      id: profile.id,
-      name: profile.display_name || "Unknown",
-      age: profile.age || 18,
-      location: profile.location || "Location not set",
-      image: profile.profile_image || defaultProfile,
-      isLocked: profile.price && Number(profile.price) > 0,
-      rating: Number(profile.rating) || 4.8,
-      price: profile.price && Number(profile.price) > 0 && selectedFilter !== "Free" 
-        ? `₦${Number(profile.price).toLocaleString()}` 
-        : undefined,
-      isOnline: profile.is_online || false,
-      isCreator: profile.price && Number(profile.price) > 0,
-    }));
+    .map((profile) => {
+      const isCreator = profile.price && Number(profile.price) > 0;
+      // Only show price for creator profiles AND when not on the "Free" filter
+      const showPrice = isCreator && selectedFilter !== "Free";
+      
+      return {
+        id: profile.id,
+        name: profile.display_name || "Unknown",
+        age: profile.age || 18,
+        location: profile.location || "Location not set",
+        image: profile.profile_image || defaultProfile,
+        isLocked: isCreator,
+        rating: Number(profile.rating) || 4.8,
+        price: showPrice ? `₦${Number(profile.price).toLocaleString()}` : undefined,
+        isOnline: profile.is_online || false,
+        isCreator: isCreator,
+      };
+    });
 
   return (
     <div className="min-h-screen bg-background">
