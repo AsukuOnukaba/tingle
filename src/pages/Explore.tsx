@@ -23,9 +23,11 @@ interface ProfileData {
   rating: number | null;
   is_online: boolean | null;
   created_at: string | null;
-  creators: {
-    status: string;
-  } | null;
+}
+
+interface CreatorData {
+  user_id: string;
+  status: string;
 }
 
 const ProfileItem = ({ profile }) => {
@@ -48,12 +50,12 @@ const Explore = () => {
   const filters = ["All", "Online", "Premium", "Free"];
 
   // Fetch real profiles from database
-  const { data: profiles, isLoading } = useOptimizedQuery<ProfileData[]>(
+  const { data: profiles, isLoading: isLoadingProfiles } = useOptimizedQuery<ProfileData[]>(
     ["profiles"],
     async () => {
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at, creators(status)")
+        .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at")
         .order("rating", { ascending: false })
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -61,10 +63,30 @@ const Explore = () => {
     }
   );
 
+  // Fetch creators separately
+  const { data: creators, isLoading: isLoadingCreators } = useOptimizedQuery<CreatorData[]>(
+    ["creators"],
+    async () => {
+      const { data, error } = await (supabase as any)
+        .from("creators")
+        .select("user_id, status")
+        .eq("status", "approved");
+      if (error) throw error;
+      return (data || []) as CreatorData[];
+    }
+  );
+
+  const isLoading = isLoadingProfiles || isLoadingCreators;
+
+  // Create a map of creator statuses for quick lookup
+  const creatorMap = new Map(
+    (creators || []).map(c => [c.user_id, c.status])
+  );
+
   // Transform and filter profiles
   const filteredProfiles = (profiles || [])
     .map((profile) => {
-      const isCreator = profile.creators?.status === 'approved';
+      const isCreator = creatorMap.get(profile.id) === 'approved';
       // Only show price for approved creators
       const showPrice = isCreator && profile.price && Number(profile.price) > 0;
       
