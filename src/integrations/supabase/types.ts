@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      content_flags: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string | null
+          description: string | null
+          flagged_by: string
+          id: string
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          description?: string | null
+          flagged_by: string
+          id?: string
+          reason: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          description?: string | null
+          flagged_by?: string
+          id?: string
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_flags_flagged_by_fkey"
+            columns: ["flagged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_flags_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_moderation: {
         Row: {
           content_id: string
@@ -53,6 +107,81 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      creator_applications: {
+        Row: {
+          age: number
+          bio: string
+          categories: string[] | null
+          content_type: string
+          created_at: string | null
+          date_of_birth: string
+          display_name: string
+          email: string
+          government_id_url: string | null
+          id: string
+          languages: string[] | null
+          location: string | null
+          phone: string | null
+          profile_photo_url: string | null
+          reason: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          social_media: Json | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          age: number
+          bio: string
+          categories?: string[] | null
+          content_type: string
+          created_at?: string | null
+          date_of_birth: string
+          display_name: string
+          email: string
+          government_id_url?: string | null
+          id?: string
+          languages?: string[] | null
+          location?: string | null
+          phone?: string | null
+          profile_photo_url?: string | null
+          reason?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          social_media?: Json | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          age?: number
+          bio?: string
+          categories?: string[] | null
+          content_type?: string
+          created_at?: string | null
+          date_of_birth?: string
+          display_name?: string
+          email?: string
+          government_id_url?: string | null
+          id?: string
+          languages?: string[] | null
+          location?: string | null
+          phone?: string | null
+          profile_photo_url?: string | null
+          reason?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          social_media?: Json | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -358,6 +487,51 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          profile_id: string
+          rating: number
+          reviewer_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          profile_id: string
+          rating: number
+          reviewer_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          profile_id?: string
+          rating?: number
+          reviewer_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

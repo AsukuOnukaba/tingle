@@ -8,6 +8,7 @@ import {
   CheckCircle,
   XCircle,
   TrendingUp,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,9 +32,31 @@ import { StatDetailModal } from "@/components/StatDetailModal";
 
 const sb = supabase as unknown as SupabaseClient<any>;
 
+interface CreatorApplication {
+  id: string;
+  user_id: string;
+  display_name: string;
+  email: string;
+  date_of_birth: string;
+  age: number;
+  location: string;
+  phone: string;
+  content_type: string;
+  bio: string;
+  profile_photo_url: string;
+  government_id_url: string;
+  social_media: any;
+  status: string;
+  created_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+}
+
 interface Creator {
   id: string;
   user_id: string;
+  display_name: string;
   status: string;
   bio: string;
   earnings: number;
@@ -53,13 +76,14 @@ interface Transaction {
 const AdminPanel = () => {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: rolesLoading } = useRoles();
+  const [applications, setApplications] = useState<CreatorApplication[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalCreators: 0,
-    pendingCreators: 0,
+    pendingApplications: 0,
     totalTransactions: 0,
     totalRevenue: 0,
   });
@@ -91,6 +115,15 @@ const AdminPanel = () => {
 
   const fetchAdminData = async () => {
     try {
+      // Fetch creator applications
+      const { data: applicationsData, error: applicationsError } = await sb
+        .from("creator_applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (applicationsError) throw applicationsError;
+      setApplications(applicationsData || []);
+
       // Fetch creators
       const { data: creatorsData, error: creatorsError } = await sb
         .from("creators")
@@ -126,7 +159,7 @@ const AdminPanel = () => {
       setStats({
         totalUsers: usersData?.length || 0,
         totalCreators: creatorsData?.filter((c: any) => c.status === 'approved').length || 0,
-        pendingCreators: creatorsData?.filter((c: any) => c.status === 'pending').length || 0,
+        pendingApplications: applicationsData?.filter((a: any) => a.status === 'pending').length || 0,
         totalTransactions: transactionsData?.length || 0,
         totalRevenue,
       });
@@ -164,39 +197,76 @@ const AdminPanel = () => {
     });
   };
 
-  const handleCreatorApproval = async (creatorId: string, status: 'approved' | 'rejected') => {
+  const handleApplicationReview = async (applicationId: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
     try {
-    const { error } = await sb
-      .from("creators")
-      .update({ status })
-      .eq("id", creatorId);
+      const application = applications.find(a => a.id === applicationId);
+      if (!application) return;
 
-      if (error) throw error;
+      // Update application status
+      const { error: updateError } = await sb
+        .from("creator_applications")
+        .update({ 
+          status,
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: rejectionReason || null
+        })
+        .eq("id", applicationId);
 
-      // If approved, add creator role
+      if (updateError) throw updateError;
+
+      // If approved, create creator record and assign role
       if (status === 'approved') {
-        const creator = creators.find(c => c.id === creatorId);
-        if (creator) {
+        // Create creator record
+        const { error: creatorError } = await sb
+          .from("creators")
+          .insert({
+            user_id: application.user_id,
+            display_name: application.display_name,
+            bio: application.bio,
+            status: 'approved',
+            application_note: `Approved application from ${application.email}`,
+          });
+
+        if (creatorError && creatorError.code !== '23505') {
+          throw creatorError;
+        }
+
+        // Assign creator role
         const { error: roleError } = await sb
           .from("user_roles")
-          .insert({ user_id: creator.user_id, role: 'creator' });
+          .insert({ user_id: application.user_id, role: 'creator' });
 
-          if (roleError && roleError.code !== '23505') { // Ignore duplicate key error
-            throw roleError;
-          }
+        if (roleError && roleError.code !== '23505') {
+          throw roleError;
+        }
+
+        // Update profile with creator info
+        const { error: profileError } = await sb
+          .from("profiles")
+          .update({
+            display_name: application.display_name,
+            bio: application.bio,
+            profile_image: application.profile_photo_url,
+          })
+          .eq("id", application.user_id);
+
+        if (profileError) {
+          console.error("Profile update error:", profileError);
         }
       }
 
       toast({
         title: "Success",
-        description: `Creator ${status === 'approved' ? 'approved' : 'rejected'} successfully.`,
+        description: `Application ${status === 'approved' ? 'approved' : 'rejected'} successfully.`,
       });
 
       fetchAdminData();
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error reviewing application:", error);
       toast({
         title: "Error",
-        description: "Failed to update creator status.",
+        description: error.message || "Failed to update application status.",
         variant: "destructive",
       });
     }
@@ -242,20 +312,20 @@ const AdminPanel = () => {
       type: 'creators' as const,
     },
     {
+      title: "Pending Applications",
+      value: stats.pendingApplications,
+      icon: Clock,
+      color: "text-orange-500",
+      bgColor: "bg-orange-500/10",
+      type: 'creators' as const,
+    },
+    {
       title: "Total Revenue",
       value: `$${stats.totalRevenue.toFixed(2)}`,
       icon: TrendingUp,
       color: "text-emerald-500",
       bgColor: "bg-emerald-500/10",
       type: 'revenue' as const,
-    },
-    {
-      title: "Total Transactions",
-      value: stats.totalTransactions,
-      icon: ShoppingCart,
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
-      type: 'transactions' as const,
     },
   ];
 
@@ -314,72 +384,145 @@ const AdminPanel = () => {
           )}
 
           {/* Tabs for different sections */}
-          <Tabs defaultValue="creators" className="animate-fade-up" style={{ animationDelay: "0.4s" }}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="creators">Creator Management</TabsTrigger>
+          <Tabs defaultValue="applications" className="animate-fade-up" style={{ animationDelay: "0.4s" }}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="applications">Creator Applications</TabsTrigger>
+              <TabsTrigger value="creators">Active Creators</TabsTrigger>
               <TabsTrigger value="transactions">Transactions</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="applications">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle>Pending Creator Applications</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {applications.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No pending applications</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {applications.map((app) => (
+                        <Card key={app.id} className="border-border/50">
+                          <CardContent className="pt-6">
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-start">
+                                <div className="space-y-1">
+                                  <h3 className="font-semibold text-lg">{app.display_name}</h3>
+                                  <p className="text-sm text-muted-foreground">{app.email}</p>
+                                  <Badge variant={
+                                    app.status === "pending" ? "secondary" :
+                                    app.status === "approved" ? "default" : "destructive"
+                                  }>
+                                    {app.status}
+                                  </Badge>
+                                </div>
+                                <div className="text-right text-sm text-muted-foreground">
+                                  <p>Age: {app.age}</p>
+                                  <p>{app.location}</p>
+                                  <p>{new Date(app.created_at).toLocaleDateString()}</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Content Type:</span>
+                                  <p className="font-medium">{app.content_type}</p>
+                                </div>
+                                {app.phone && (
+                                  <div>
+                                    <span className="text-muted-foreground">Phone:</span>
+                                    <p className="font-medium">{app.phone}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div>
+                                <span className="text-sm text-muted-foreground">Bio:</span>
+                                <p className="text-sm mt-1">{app.bio}</p>
+                              </div>
+
+                              <div className="flex gap-2">
+                                {app.profile_photo_url && (
+                                  <a href={app.profile_photo_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                                    View Profile Photo
+                                  </a>
+                                )}
+                                {app.government_id_url && (
+                                  <a href={app.government_id_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                                    View Government ID
+                                  </a>
+                                )}
+                              </div>
+
+                              {app.status === "pending" && (
+                                <div className="flex gap-2 pt-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApplicationReview(app.id, "approved")}
+                                    className="bg-green-500 hover:bg-green-600 flex-1"
+                                  >
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      const reason = prompt("Reason for rejection (optional):");
+                                      handleApplicationReview(app.id, "rejected", reason || undefined);
+                                    }}
+                                    className="flex-1"
+                                  >
+                                    <XCircle className="w-4 h-4 mr-2" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+
+                              {app.rejection_reason && (
+                                <div className="bg-destructive/10 p-3 rounded-lg">
+                                  <p className="text-sm text-destructive">
+                                    <strong>Rejection reason:</strong> {app.rejection_reason}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="creators">
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle>Creator Approvals</CardTitle>
+                  <CardTitle>Active Creators</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Name</TableHead>
                         <TableHead>Bio</TableHead>
                         <TableHead>Uploads</TableHead>
                         <TableHead>Earnings</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>Date Joined</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {creators.map((creator) => (
+                      {creators.filter(c => c.status === 'approved').map((creator) => (
                         <TableRow key={creator.id}>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                creator.status === "approved"
-                                  ? "default"
-                                  : creator.status === "pending"
-                                  ? "secondary"
-                                  : "destructive"
-                              }
-                            >
-                              {creator.status}
-                            </Badge>
-                          </TableCell>
+                          <TableCell>{creator.display_name || 'N/A'}</TableCell>
                           <TableCell className="max-w-xs truncate">
                             {creator.bio || "No bio"}
                           </TableCell>
-                          <TableCell>{creator.total_uploads}</TableCell>
-                          <TableCell>${creator.earnings.toFixed(2)}</TableCell>
+                          <TableCell>{creator.total_uploads || 0}</TableCell>
+                          <TableCell>${(creator.earnings || 0).toFixed(2)}</TableCell>
                           <TableCell>
                             {new Date(creator.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            {creator.status === "pending" && (
-                              <div className="flex space-x-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleCreatorApproval(creator.id, "approved")}
-                                  className="bg-green-500 hover:bg-green-600"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleCreatorApproval(creator.id, "rejected")}
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            )}
                           </TableCell>
                         </TableRow>
                       ))}
