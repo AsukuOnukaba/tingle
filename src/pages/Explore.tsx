@@ -63,25 +63,10 @@ const Explore = () => {
 
   // Transform and filter profiles
   const filteredProfiles = (profiles || [])
-    .filter((profile) => {
-      const matchesSearch = 
-        profile.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        profile.location?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const isCreator = profile.creators?.status === 'approved';
-      
-      const matchesFilter = 
-        selectedFilter === "All" ||
-        (selectedFilter === "Online" && profile.is_online) ||
-        (selectedFilter === "Premium" && isCreator) ||
-        (selectedFilter === "Free" && !isCreator);
-
-      return matchesSearch && matchesFilter;
-    })
     .map((profile) => {
       const isCreator = profile.creators?.status === 'approved';
-      // Only show price for approved creators AND when not on the "Free" filter
-      const showPrice = isCreator && selectedFilter !== "Free" && profile.price && Number(profile.price) > 0;
+      // Only show price for approved creators
+      const showPrice = isCreator && profile.price && Number(profile.price) > 0;
       
       return {
         id: profile.id,
@@ -95,6 +80,19 @@ const Explore = () => {
         isOnline: profile.is_online || false,
         isCreator: isCreator,
       };
+    })
+    .filter((profile) => {
+      const matchesSearch = 
+        profile.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        profile.location?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesFilter = 
+        selectedFilter === "All" ||
+        (selectedFilter === "Online" && profile.isOnline) ||
+        (selectedFilter === "Premium" && profile.isCreator) ||
+        (selectedFilter === "Free" && !profile.isCreator);
+
+      return matchesSearch && matchesFilter;
     });
 
   return (
