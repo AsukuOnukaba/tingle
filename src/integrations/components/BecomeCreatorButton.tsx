@@ -12,7 +12,19 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { CreatorApplicationForm } from "@/components/CreatorApplicationForm";
 
-export const BecomeCreatorButton = () => {
+interface ProfileData {
+  email?: string;
+  displayName?: string;
+  location?: string;
+  age?: number;
+  bio?: string;
+}
+
+interface BecomeCreatorButtonProps {
+  profileData?: ProfileData;
+}
+
+export const BecomeCreatorButton = ({ profileData }: BecomeCreatorButtonProps) => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
@@ -38,6 +50,7 @@ export const BecomeCreatorButton = () => {
         <CreatorApplicationForm 
           onSuccess={handleSuccess}
           onCancel={() => setOpen(false)}
+          initialData={profileData}
         />
       </DialogContent>
     </Dialog>

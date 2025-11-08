@@ -27,7 +27,8 @@ const Navigation = () => {
     { path: "/wallet", icon: Wallet, label: "Wallet" },
     { path: "/my-profile", icon: User, label: "Profile" },
     { path: chatPath, icon: MessageCircle, label: "Chat" },
-    { path: "/creator", icon: Sparkles, label: "Creator" },
+    // Hide Creator application page for approved creators
+    ...(!isCreator ? [{ path: "/creator", icon: Sparkles, label: "Creator" }] : []),
   ];
 
   return (

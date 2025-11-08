@@ -11,9 +11,8 @@ const corsHeaders = {
 
 interface NotifyRequest {
   user_id: string;
-  creator_name: string;
-  creator_email: string;
-  reason: string;
+  display_name: string;
+  email: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -23,12 +22,12 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { user_id, creator_name, creator_email, reason }: NotifyRequest = await req.json();
+    const { user_id, display_name, email }: NotifyRequest = await req.json();
     
     console.log('📧 Sending creator application notification', {
       user_id,
-      creator_name,
-      creator_email
+      display_name,
+      email
     });
 
     const adminEmail = Deno.env.get("ADMIN_EMAIL");
@@ -48,12 +47,9 @@ const handler = async (req: Request): Promise<Response> => {
         <p>A new user has applied to become a creator on Tingle.</p>
         
         <h2>Application Details:</h2>
-        <p><strong>Name:</strong> ${creator_name}</p>
-        <p><strong>Email:</strong> ${creator_email}</p>
+        <p><strong>Name:</strong> ${display_name}</p>
+        <p><strong>Email:</strong> ${email}</p>
         <p><strong>User ID:</strong> ${user_id}</p>
-        
-        <h2>Application Reason:</h2>
-        <p>${reason}</p>
         
         <p>Please review this application in the admin dashboard.</p>
       `,

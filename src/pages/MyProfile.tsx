@@ -548,8 +548,21 @@ const MyProfile = () => {
                       </div>
                     </div>
 
-                    {!isCreator && (
-                      <BecomeCreatorButton />
+                  {!isCreator && (
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Want to start earning money? Become a Creator.
+                        </p>
+                        <BecomeCreatorButton 
+                          profileData={{
+                            email: user?.email || "",
+                            displayName: profile.display_name,
+                            location: profile.location,
+                            age: parseInt(profile.age) || 18,
+                            bio: profile.bio
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
 

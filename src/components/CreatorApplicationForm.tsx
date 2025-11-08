@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, Camera, User, Mail, MapPin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle2, Clock, XCircle } from "lucide-react";
 
 interface CreatorFormData {
   displayName: string;
@@ -53,26 +55,37 @@ const contentTypes = [
 const allCategories = ["Lifestyle", "Fashion", "Gaming", "Art", "Music", "Fitness", "Beauty", "Tech", "Food", "Travel"];
 const allLanguages = ["English", "Spanish", "French", "German", "Italian", "Portuguese", "Japanese", "Korean", "Chinese"];
 
+interface ProfileData {
+  email?: string;
+  displayName?: string;
+  location?: string;
+  age?: number;
+  bio?: string;
+}
+
 interface CreatorApplicationFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  initialData?: ProfileData;
 }
 
-export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicationFormProps) => {
+export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: CreatorApplicationFormProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [existingApplication, setExistingApplication] = useState<any>(null);
+  const [checkingApplication, setCheckingApplication] = useState(true);
   
   const [formData, setFormData] = useState<CreatorFormData>({
-    displayName: "",
-    email: "",
+    displayName: initialData?.displayName || "",
+    email: initialData?.email || "",
     dateOfBirth: "",
-    age: 18,
-    location: "",
+    age: initialData?.age || 18,
+    location: initialData?.location || "",
     phone: "",
     contentType: "",
     categories: [],
     languages: [],
-    bio: "",
+    bio: initialData?.bio || "",
     profilePhoto: null,
     governmentId: null,
     instagramUrl: "",
@@ -81,6 +94,35 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
+
+  // Check for existing application on mount
+  useEffect(() => {
+    const checkExistingApplication = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setCheckingApplication(false);
+          return;
+        }
+
+        const { data, error } = await (supabase as any)
+          .from('creator_applications')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (data) {
+          setExistingApplication(data);
+        }
+      } catch (error) {
+        console.log('No existing application found');
+      } finally {
+        setCheckingApplication(false);
+      }
+    };
+
+    checkExistingApplication();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -230,29 +272,67 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
       }
 
       // Save application to database
-      const { error: dbError } = await (supabase as any)
-        .from('creator_applications')
-        .insert({
-          user_id: session.user.id,
-          display_name: formData.displayName,
-          email: formData.email,
-          date_of_birth: formData.dateOfBirth,
-          age: formData.age,
-          location: formData.location,
-          phone: formData.phone,
-          content_type: formData.contentType,
-          categories: formData.categories,
-          languages: formData.languages,
-          bio: formData.bio,
-          profile_photo_url: profilePhotoUrl,
-          government_id_url: governmentIdUrl,
-          social_media: {
-            instagram: formData.instagramUrl,
-            tiktok: formData.tiktokUrl,
-            twitter: formData.twitterUrl,
-          },
-          status: 'pending'
-        });
+      let dbError;
+      
+      if (existingApplication) {
+        // Update existing application (for resubmissions)
+        const { error } = await (supabase as any)
+          .from('creator_applications')
+          .update({
+            display_name: formData.displayName,
+            email: formData.email,
+            date_of_birth: formData.dateOfBirth,
+            age: formData.age,
+            location: formData.location,
+            phone: formData.phone,
+            content_type: formData.contentType,
+            categories: formData.categories,
+            languages: formData.languages,
+            bio: formData.bio,
+            profile_photo_url: profilePhotoUrl,
+            government_id_url: governmentIdUrl,
+            social_media: {
+              instagram: formData.instagramUrl,
+              tiktok: formData.tiktokUrl,
+              twitter: formData.twitterUrl,
+            },
+            status: 'pending',
+            reviewed_by: null,
+            reviewed_at: null,
+            rejection_reason: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', session.user.id);
+        
+        dbError = error;
+      } else {
+        // Insert new application
+        const { error } = await (supabase as any)
+          .from('creator_applications')
+          .insert({
+            user_id: session.user.id,
+            display_name: formData.displayName,
+            email: formData.email,
+            date_of_birth: formData.dateOfBirth,
+            age: formData.age,
+            location: formData.location,
+            phone: formData.phone,
+            content_type: formData.contentType,
+            categories: formData.categories,
+            languages: formData.languages,
+            bio: formData.bio,
+            profile_photo_url: profilePhotoUrl,
+            government_id_url: governmentIdUrl,
+            social_media: {
+              instagram: formData.instagramUrl,
+              tiktok: formData.tiktokUrl,
+              twitter: formData.twitterUrl,
+            },
+            status: 'pending'
+          });
+        
+        dbError = error;
+      }
 
       if (dbError) {
         if (dbError.code === '23505') {
@@ -269,7 +349,11 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
       // Send notification email to admin
       try {
         await supabase.functions.invoke('notify-creator-application', {
-          body: { user_id: session.user.id, display_name: formData.displayName, email: formData.email },
+          body: { 
+            user_id: session.user.id, 
+            display_name: formData.displayName, 
+            email: formData.email 
+          },
         });
       } catch (emailError) {
         console.error('Error sending notification:', emailError);
@@ -345,6 +429,33 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-h-[70vh] overflow-y-auto px-2">
+      {checkingApplication && (
+        <div className="text-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-sm text-muted-foreground mt-2">Checking application status...</p>
+        </div>
+      )}
+
+      {!checkingApplication && existingApplication && (
+        <Alert className={existingApplication.status === 'pending' ? 'border-yellow-500/50 bg-yellow-500/10' : existingApplication.status === 'approved' ? 'border-green-500/50 bg-green-500/10' : 'border-red-500/50 bg-red-500/10'}>
+          {existingApplication.status === 'pending' && <Clock className="h-4 w-4 text-yellow-500" />}
+          {existingApplication.status === 'approved' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+          {existingApplication.status === 'rejected' && <XCircle className="h-4 w-4 text-red-500" />}
+          <AlertTitle>
+            {existingApplication.status === 'pending' && 'Application Pending'}
+            {existingApplication.status === 'approved' && 'Application Approved'}
+            {existingApplication.status === 'rejected' && 'Application Rejected'}
+          </AlertTitle>
+          <AlertDescription>
+            {existingApplication.status === 'pending' && 'Your creator application is currently under review. We will notify you once it has been processed.'}
+            {existingApplication.status === 'approved' && 'Congratulations! Your creator application has been approved. You can now access the creator dashboard.'}
+            {existingApplication.status === 'rejected' && `Your application was rejected. Reason: ${existingApplication.rejection_reason || 'Not specified'}`}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!checkingApplication && !existingApplication && (
+        <>
       {/* Personal Information */}
       <div className="space-y-6">
         <h3 className="text-lg font-semibold flex items-center">
@@ -562,7 +673,7 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
             type="button"
             variant="outline"
             onClick={onCancel}
-            disabled={loading}
+            disabled={loading || (existingApplication && existingApplication.status !== 'rejected')}
             className="flex-1"
           >
             Cancel
@@ -570,10 +681,10 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
         )}
         <Button
           type="submit"
-          disabled={loading || formData.age < 18}
+          disabled={loading || formData.age < 18 || (existingApplication && existingApplication.status !== 'rejected')}
           className="flex-1 gradient-primary"
         >
-          {loading ? "Submitting..." : "Submit Application"}
+          {loading ? "Submitting..." : existingApplication?.status === 'rejected' ? "Resubmit Application" : "Submit Application"}
         </Button>
       </div>
 
@@ -581,6 +692,8 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel }: CreatorApplicati
         <p className="text-sm text-destructive text-center">
           You must be at least 18 years old to apply
         </p>
+      )}
+        </>
       )}
     </form>
   );
