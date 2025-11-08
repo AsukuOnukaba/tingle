@@ -222,6 +222,7 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
+        setLoading(false);
         toast({
           variant: "destructive",
           title: "Authentication required",
@@ -230,46 +231,56 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
         return;
       }
 
-      let profilePhotoUrl = '';
-      let governmentIdUrl = '';
-
-      // Upload profile photo
+      // Upload both files in parallel for faster performance
+      const uploadPromises = [];
+      
       if (formData.profilePhoto) {
         const fileExt = formData.profilePhoto.name.split('.').pop();
         const fileName = `${session.user.id}-profile-${Date.now()}.${fileExt}`;
         const filePath = `creator-applications/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('profile-images')
-          .upload(filePath, formData.profilePhoto);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(filePath);
-
-        profilePhotoUrl = publicUrl;
+        
+        uploadPromises.push(
+          supabase.storage
+            .from('profile-images')
+            .upload(filePath, formData.profilePhoto)
+            .then(({ error }) => {
+              if (error) throw error;
+              const { data: { publicUrl } } = supabase.storage
+                .from('profile-images')
+                .getPublicUrl(filePath);
+              return { type: 'profile', url: publicUrl };
+            })
+        );
       }
 
-      // Upload government ID
       if (formData.governmentId) {
         const fileExt = formData.governmentId.name.split('.').pop();
         const fileName = `${session.user.id}-govid-${Date.now()}.${fileExt}`;
         const filePath = `creator-applications/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('profile-images')
-          .upload(filePath, formData.governmentId);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(filePath);
-
-        governmentIdUrl = publicUrl;
+        
+        uploadPromises.push(
+          supabase.storage
+            .from('profile-images')
+            .upload(filePath, formData.governmentId)
+            .then(({ error }) => {
+              if (error) throw error;
+              const { data: { publicUrl } } = supabase.storage
+                .from('profile-images')
+                .getPublicUrl(filePath);
+              return { type: 'government', url: publicUrl };
+            })
+        );
       }
+
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      let profilePhotoUrl = '';
+      let governmentIdUrl = '';
+      
+      uploadResults.forEach(result => {
+        if (result.type === 'profile') profilePhotoUrl = result.url;
+        if (result.type === 'government') governmentIdUrl = result.url;
+      });
 
       // Save application to database
       let dbError;
@@ -346,22 +357,20 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
         throw dbError;
       }
 
-      // Send notification email to admin
-      try {
-        await supabase.functions.invoke('notify-creator-application', {
-          body: { 
-            user_id: session.user.id, 
-            display_name: formData.displayName, 
-            email: formData.email 
-          },
-        });
-      } catch (emailError) {
-        console.error('Error sending notification:', emailError);
-      }
-
       toast({
         title: "Application submitted!",
         description: "Your application has been sent to the admin for review.",
+      });
+
+      // Send notification email to admin (non-blocking, fire and forget)
+      supabase.functions.invoke('notify-creator-application', {
+        body: { 
+          user_id: session.user.id, 
+          display_name: formData.displayName, 
+          email: formData.email 
+        },
+      }).catch(emailError => {
+        console.error('Error sending notification:', emailError);
       });
 
       onSuccess?.();
