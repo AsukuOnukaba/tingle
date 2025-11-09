@@ -4,13 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Link, useParams } from "react-router-dom";
 import Navigation from "@/components/Navigation";
-import { getProfile } from "@/lib/profileData";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { supabase } from './../integrations/supabase/client.ts';
 import { Button } from './../integrations/components/ui/button.tsx';
 import { Database } from './../lib/database.types.ts';
-
-// fixed import: don't include file extension and ensure file exists
 
 interface Message {
   id: string;
@@ -20,9 +17,14 @@ interface Message {
   type?: "text" | "tip" | "unlock";
 }
 
-type DBMessage = Database["public"]["Tables"]["messages"]["Row"];
-type TablesInsert = Database["public"]["Tables"];
+interface Profile {
+  id: string;
+  display_name: string;
+  profile_image: string;
+  is_online: boolean;
+}
 
+type DBMessage = Database["public"]["Tables"]["messages"]["Row"];
 
 const mapDbMessageToMessage = (row: DBMessage, currentUserId: string | null): Message => {
   const senderRole = row.sender_id === currentUserId ? "user" : "creator";
@@ -39,32 +41,54 @@ const Chat = () => {
   const { recipientId } = useParams<{ recipientId: string }>();
   const { currentProfileId } = useCurrentProfile();
   
-  const profile = getProfile(Number(recipientId));
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Generate consistent conversation ID
-  const conversationId = [currentProfileId, recipientId].sort().join("_");
 
   // ---------- Scroll to Bottom ----------
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // ---------- Fetch Recipient Profile ----------
+  useEffect(() => {
+    if (!recipientId) return;
+
+    const fetchProfile = async () => {
+      const { data, error }: any = await (supabase as any)
+        .from("profiles")
+        .select("id, display_name, profile_image, is_online")
+        .eq("id", recipientId)
+        .maybeSingle();
+
+      if (!error && data) {
+        setProfile({
+          id: data.id,
+          display_name: data.display_name,
+          profile_image: data.profile_image || '',
+          is_online: data.is_online || false,
+        });
+      }
+    };
+
+    fetchProfile();
+  }, [recipientId]);
+
   // ---------- Fetch Messages ----------
   useEffect(() => {
-    if (!conversationId || !currentProfileId) return;
+    if (!recipientId || !currentProfileId) return;
 
     let cancelled = false;
     const fetchMessages = async () => {
       try {
+        // Fetch messages between current user and recipient
         const { data, error } = await supabase
           .from("messages")
           .select("*")
-          .eq("conversation_id", conversationId)
+          .or(`and(sender_id.eq.${currentProfileId},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${currentProfileId})`)
           .order("created_at", { ascending: true });
 
         if (error) {
@@ -89,25 +113,31 @@ const Chat = () => {
     return () => {
       cancelled = true;
     };
-  }, [conversationId, currentProfileId]);
+  }, [recipientId, currentProfileId]);
 
   // ---------- Subscribe to Real-time Messages ----------
   useEffect(() => {
-    if (!conversationId || !currentProfileId) return;
+    if (!recipientId || !currentProfileId) return;
 
     const channel = supabase
-      .channel(`chat_${conversationId}`)
+      .channel(`chat_${currentProfileId}_${recipientId}`)
       .on(
         "postgres_changes",
         { 
           event: "INSERT", 
           schema: "public", 
-          table: "messages", 
-          filter: `conversation_id=eq.${conversationId}` 
+          table: "messages"
         },
         (payload) => {
           const newMsg = payload.new as DBMessage;
           if (!newMsg) return;
+          
+          // Only add message if it's part of this conversation
+          const isRelevant = 
+            (newMsg.sender_id === currentProfileId && newMsg.recipient_id === recipientId) ||
+            (newMsg.sender_id === recipientId && newMsg.recipient_id === currentProfileId);
+          
+          if (!isRelevant) return;
           
           const newMessageObj: Message = {
             id: String(newMsg.id),
@@ -120,14 +150,12 @@ const Chat = () => {
           scrollToBottom();
         }
       )
-      .subscribe((status) => {
-        console.log("Realtime subscribe status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, currentProfileId]);
+  }, [recipientId, currentProfileId]);
 
   // ---------- Send Message ----------
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -135,7 +163,7 @@ const Chat = () => {
     if (!newMessage.trim() || !currentProfileId || !recipientId) return;
 
     const messagePayload = {
-      conversation_id: conversationId,
+      conversation_id: [currentProfileId, recipientId].sort().join("_"),
       sender_id: currentProfileId,
       recipient_id: recipientId,
       text: newMessage.trim(),
@@ -189,7 +217,7 @@ const Chat = () => {
     if (!currentProfileId || !recipientId) return;
 
     const tipPayload: Database["public"]["Tables"]["messages"]["Insert"] = {
-      conversation_id: conversationId,
+      conversation_id: [currentProfileId, recipientId].sort().join("_"),
       text: `Sent a $${amount} tip`,
       sender_id: currentProfileId,
       recipient_id: recipientId,
@@ -253,19 +281,19 @@ const Chat = () => {
                 {profile && (
                   <div className="relative">
                     <img
-                      src={profile.image}
-                      alt={profile.name || "User"}
+                      src={profile.profile_image || "/placeholder.svg"}
+                      alt={profile.display_name || "User"}
                       className="w-12 h-12 rounded-full object-cover"
                     />
-                    {profile.isOnline && (
+                    {profile.is_online && (
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full" />
                     )}
                   </div>
                 )}
                 <div>
-                  <h3 className="font-semibold">{profile.name}</h3>
-                  <Badge variant="secondary" className={`${profile.isOnline ? "bg-green-500/20 text-green-400" : "bg-muted/50"} border-none text-xs`}>
-                    {profile.isOnline ? "Online" : "Offline"}
+                  <h3 className="font-semibold">{profile?.display_name || "User"}</h3>
+                  <Badge variant="secondary" className={`${profile?.is_online ? "bg-green-500/20 text-green-400" : "bg-muted/50"} border-none text-xs`}>
+                    {profile?.is_online ? "Online" : "Offline"}
                   </Badge>
                 </div>
               </div>
@@ -330,7 +358,7 @@ const Chat = () => {
         {/* Message Input */}
         <div className="glass-card border-t border-border/50 px-4 py-4">
           <div className="max-w-4xl mx-auto">
-            {!profile.isOnline && (
+            {profile && !profile.is_online && (
               <div className="mb-3 p-3 bg-muted/50 rounded-lg text-center">
                 <p className="text-sm text-muted-foreground">
                   This creator is currently offline. They'll see your message when they return.
@@ -344,7 +372,7 @@ const Chat = () => {
                   variant="ghost" 
                   size="sm" 
                   className="hover:bg-muted/50 transition-smooth"
-                  disabled={!profile.isOnline}
+                  disabled={!profile?.is_online}
                 >
                   <Image className="w-4 h-4" />
                 </Button>
@@ -353,7 +381,7 @@ const Chat = () => {
                   variant="ghost" 
                   size="sm" 
                   className="hover:bg-muted/50 transition-smooth"
-                  disabled={!profile.isOnline}
+                  disabled={!profile?.is_online}
                 >
                   <Smile className="w-4 h-4" />
                 </Button>
@@ -362,14 +390,14 @@ const Chat = () => {
               <Input 
                 value={newMessage} 
                 onChange={(e) => setNewMessage(e.target.value)} 
-                placeholder={profile.isOnline ? "Type a message..." : "Creator is offline..."} 
+                placeholder={profile?.is_online ? "Type a message..." : "Creator is offline..."} 
                 className="flex-1 bg-muted/50 border-border/50 focus:border-primary transition-smooth"
-                disabled={!profile.isOnline}
+                disabled={!profile?.is_online}
               />
 
               <Button 
                 type="submit" 
-                disabled={!newMessage.trim() || !profile.isOnline} 
+                disabled={!newMessage.trim() || !profile?.is_online} 
                 className="gradient-primary hover:opacity-90 transition-smooth neon-glow"
               >
                 <Send className="w-4 h-4" />

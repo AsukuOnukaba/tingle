@@ -221,7 +221,7 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session) {
+      if (!session?.user?.id) {
         setLoading(false);
         toast({
           variant: "destructive",
@@ -230,6 +230,8 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
         });
         return;
       }
+
+      console.log('Authenticated user ID:', session.user.id);
 
       // Upload both files in parallel for faster performance
       const uploadPromises = [];
@@ -285,34 +287,42 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
       // Save application to database
       let dbError;
       
+      const applicationData = {
+        user_id: session.user.id,
+        display_name: formData.displayName,
+        email: formData.email,
+        date_of_birth: formData.dateOfBirth,
+        age: formData.age,
+        location: formData.location,
+        phone: formData.phone,
+        content_type: formData.contentType,
+        categories: formData.categories,
+        languages: formData.languages,
+        bio: formData.bio,
+        profile_photo_url: profilePhotoUrl || existingApplication?.profile_photo_url || '',
+        government_id_url: governmentIdUrl || existingApplication?.government_id_url || '',
+        social_media: {
+          instagram: formData.instagramUrl,
+          tiktok: formData.tiktokUrl,
+          twitter: formData.twitterUrl,
+        },
+        status: 'pending' as const,
+      };
+
+      console.log('Submitting application:', applicationData);
+      
       if (existingApplication) {
         // Update existing application (for resubmissions)
         const { error } = await (supabase as any)
           .from('creator_applications')
           .update({
-            display_name: formData.displayName,
-            email: formData.email,
-            date_of_birth: formData.dateOfBirth,
-            age: formData.age,
-            location: formData.location,
-            phone: formData.phone,
-            content_type: formData.contentType,
-            categories: formData.categories,
-            languages: formData.languages,
-            bio: formData.bio,
-            profile_photo_url: profilePhotoUrl,
-            government_id_url: governmentIdUrl,
-            social_media: {
-              instagram: formData.instagramUrl,
-              tiktok: formData.tiktokUrl,
-              twitter: formData.twitterUrl,
-            },
-            status: 'pending',
+            ...applicationData,
             reviewed_by: null,
             reviewed_at: null,
             rejection_reason: null,
             updated_at: new Date().toISOString(),
           })
+          .eq('id', existingApplication.id)
           .eq('user_id', session.user.id);
         
         dbError = error;
@@ -320,32 +330,13 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
         // Insert new application
         const { error } = await (supabase as any)
           .from('creator_applications')
-          .insert({
-            user_id: session.user.id,
-            display_name: formData.displayName,
-            email: formData.email,
-            date_of_birth: formData.dateOfBirth,
-            age: formData.age,
-            location: formData.location,
-            phone: formData.phone,
-            content_type: formData.contentType,
-            categories: formData.categories,
-            languages: formData.languages,
-            bio: formData.bio,
-            profile_photo_url: profilePhotoUrl,
-            government_id_url: governmentIdUrl,
-            social_media: {
-              instagram: formData.instagramUrl,
-              tiktok: formData.tiktokUrl,
-              twitter: formData.twitterUrl,
-            },
-            status: 'pending'
-          });
+          .insert([applicationData]);
         
         dbError = error;
       }
 
       if (dbError) {
+        console.error('Database error:', dbError);
         if (dbError.code === '23505') {
           toast({
             variant: "destructive",
@@ -354,6 +345,11 @@ export const CreatorApplicationForm = ({ onSuccess, onCancel, initialData }: Cre
           });
           return;
         }
+        toast({
+          variant: "destructive",
+          title: "Submission failed",
+          description: dbError.message || "Failed to save application. Please try again.",
+        });
         throw dbError;
       }
 
