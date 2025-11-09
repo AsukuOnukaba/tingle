@@ -53,14 +53,14 @@ const Chat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // ---------- Fetch Recipient Profile ----------
+  // ---------- Fetch Recipient Profile & Subscribe to Presence ----------
   useEffect(() => {
     if (!recipientId) return;
 
     const fetchProfile = async () => {
       const { data, error }: any = await (supabase as any)
         .from("profiles")
-        .select("id, display_name, profile_image, is_online")
+        .select("id, display_name, profile_image, is_online, last_activity_at")
         .eq("id", recipientId)
         .maybeSingle();
 
@@ -75,6 +75,33 @@ const Chat = () => {
     };
 
     fetchProfile();
+
+    // Subscribe to profile changes for real-time presence updates
+    const presenceChannel = supabase
+      .channel(`profile_${recipientId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${recipientId}`
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated) {
+            setProfile(prev => prev ? {
+              ...prev,
+              is_online: updated.is_online || false
+            } : null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
   }, [recipientId]);
 
   // ---------- Fetch Messages ----------

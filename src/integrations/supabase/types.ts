@@ -546,6 +546,7 @@ export type Database = {
           display_name: string
           id: string
           is_online: boolean | null
+          last_activity_at: string | null
           last_seen: string | null
           location: string | null
           price: number | null
@@ -563,6 +564,7 @@ export type Database = {
           display_name: string
           id: string
           is_online?: boolean | null
+          last_activity_at?: string | null
           last_seen?: string | null
           location?: string | null
           price?: number | null
@@ -580,6 +582,7 @@ export type Database = {
           display_name?: string
           id?: string
           is_online?: boolean | null
+          last_activity_at?: string | null
           last_seen?: string | null
           location?: string | null
           price?: number | null
@@ -901,6 +904,8 @@ export type Database = {
         }
         Returns: string
       }
+      update_my_activity: { Args: never; Returns: undefined }
+      update_user_online_status: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "user" | "creator" | "admin"

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
+import { usePresence } from "@/hooks/usePresence";
 
 import Index from "./pages/Index";
 import Home from "./pages/Home";
@@ -37,6 +38,12 @@ import ContentBackup from "./pages/ContentBackup";
 
 const queryClient = new QueryClient();
 
+const AppContent = () => {
+  // Enable presence tracking for all authenticated users
+  usePresence();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -44,6 +51,7 @@ const App = () => (
       <Sonner />
       <Analytics />
       <BrowserRouter>
+        <AppContent />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/home" element={<Home />} />
