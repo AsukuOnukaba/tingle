@@ -14,6 +14,7 @@ import Profile from "./pages/Profile";
 import MyProfile from "./pages/MyProfile";
 import Chat from "./pages/Chat";
 import ChatList from "./pages/ChatList";
+import Messages from "./pages/Messages";
 import Creator from "./pages/Creator";
 import CreatorPending from "./pages/CreatorPending";
 import About from "./pages/About";
@@ -61,6 +62,9 @@ const App = () => (
           <Route path="/my-profile" element={<MyProfile />} />
           <Route path="/chat" element={<ChatList />} />
           <Route path="/chat/:recipientId" element={<Chat />} />
+          <Route path="/chat-list" element={<ChatList />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/messages/:recipientId" element={<Messages />} />
           <Route path="/creator" element={<Creator />} />
           <Route path="/creator/pending" element={<CreatorPending />} />
           <Route path="/subscription/:creatorId" element={<SubscriptionPlans />} />

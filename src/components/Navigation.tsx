@@ -19,14 +19,12 @@ const Navigation = () => {
     navigate("/login");
   };
 
-  const chatPath = currentProfileId ? `/chat/${currentProfileId}` : "/chat";
-
   const navItems = [
     { path: "/explore", icon: Heart, label: "Explore" },
     { path: "/my-purchases", icon: ShoppingBag, label: "My Purchases" },
     { path: "/wallet", icon: Wallet, label: "Wallet" },
     { path: "/my-profile", icon: User, label: "Profile" },
-    { path: chatPath, icon: MessageCircle, label: "Chat" },
+    { path: "/messages", icon: MessageCircle, label: "Chat" },
     // Hide Creator application page for approved creators
     ...(!isCreator ? [{ path: "/creator", icon: Sparkles, label: "Creator" }] : []),
   ];

@@ -364,9 +364,12 @@ export type Database = {
           conversation_id: string
           created_at: string | null
           creator_id: string | null
+          delivered_at: string | null
+          delivery_status: string | null
           id: string
           is_read: boolean | null
           metadata: Json | null
+          read_at: string | null
           recipient_id: string
           sender_id: string
           text: string
@@ -376,9 +379,12 @@ export type Database = {
           conversation_id: string
           created_at?: string | null
           creator_id?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
           id?: string
           is_read?: boolean | null
           metadata?: Json | null
+          read_at?: string | null
           recipient_id: string
           sender_id: string
           text: string
@@ -388,9 +394,12 @@ export type Database = {
           conversation_id?: string
           created_at?: string | null
           creator_id?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
           id?: string
           is_read?: boolean | null
           metadata?: Json | null
+          read_at?: string | null
           recipient_id?: string
           sender_id?: string
           text?: string
@@ -729,6 +738,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      typing_status: {
+        Row: {
+          conversation_id: string
+          id: string
+          is_typing: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "typing_status_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_photos: {
         Row: {
