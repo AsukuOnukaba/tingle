@@ -286,25 +286,47 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
       delivery_status: profile?.is_online ? 'delivered' : 'sent'
     };
 
+    const tempMessage = newMessage.trim();
     setNewMessage("");
     updateTypingStatus(false);
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("messages")
         .insert([messagePayload]);
 
       if (error) {
         console.error("Error sending message:", error);
+        setNewMessage(tempMessage);
         toast({
           variant: "destructive",
           title: "Failed to send message",
-          description: "Please try again."
+          description: error.message || "Please try again."
         });
       }
     } catch (err) {
       console.error("Send message failed:", err);
+      setNewMessage(tempMessage);
+      toast({
+        variant: "destructive",
+        title: "Failed to send message",
+        description: "Please try again."
+      });
     }
+  };
+
+  const handleImageUpload = () => {
+    toast({
+      title: "Feature coming soon",
+      description: "Image sharing will be available soon!"
+    });
+  };
+
+  const handleEmojiPicker = () => {
+    toast({
+      title: "Feature coming soon", 
+      description: "Emoji picker will be available soon!"
+    });
   };
 
   const handleTip = async (amount: string) => {
@@ -447,10 +469,10 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
         <div className="max-w-4xl mx-auto">
           <form onSubmit={handleSendMessage} className="flex space-x-2">
             <div className="flex space-x-2">
-              <Button type="button" variant="ghost" size="sm">
+              <Button type="button" variant="ghost" size="sm" onClick={handleImageUpload}>
                 <Image className="w-4 h-4" />
               </Button>
-              <Button type="button" variant="ghost" size="sm">
+              <Button type="button" variant="ghost" size="sm" onClick={handleEmojiPicker}>
                 <Smile className="w-4 h-4" />
               </Button>
             </div>
