@@ -42,6 +42,8 @@ const Profile = () => {
   const [creatorId, setCreatorId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [userPhotos, setUserPhotos] = useState<any[]>([]);
+  const [creatorPlans, setCreatorPlans] = useState<any[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
 
   useEffect(() => {
     if (id) {
@@ -52,6 +54,12 @@ const Profile = () => {
       fetchUserPhotos(id);
     }
   }, [id, setCurrentProfileId]);
+
+  useEffect(() => {
+    if (creatorId) {
+      fetchCreatorPlans();
+    }
+  }, [creatorId]);
 
   const fetchProfile = async (profileId: string) => {
     try {
@@ -108,6 +116,25 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error fetching creator:', error);
+    }
+  };
+
+  const fetchCreatorPlans = async () => {
+    if (!creatorId) return;
+    
+    try {
+      const { data, error } = await (supabase as any)
+        .from('subscription_plans')
+        .select('*')
+        .eq('creator_id', creatorId)
+        .eq('is_active', true)
+        .order('price', { ascending: true });
+
+      if (!error && data) {
+        setCreatorPlans(data);
+      }
+    } catch (error) {
+      console.error('Error fetching creator plans:', error);
     }
   };
 
@@ -168,7 +195,7 @@ const Profile = () => {
     }, 100);
   };
 
-  const handleSubscribe = () => {
+  const handleSubscribe = (plan?: any) => {
     if (!user) {
       toast.error("Please login to subscribe");
       return;
@@ -177,6 +204,11 @@ const Profile = () => {
       toast.error("This profile is not set up as a creator yet. Only approved creators can accept subscriptions.");
       return;
     }
+    if (creatorPlans.length === 0) {
+      toast.error("This creator hasn't created any subscription plans yet.");
+      return;
+    }
+    setSelectedPlan(plan || creatorPlans[0]);
     setShowSubscriptionModal(true);
   };
 
@@ -512,15 +544,16 @@ const Profile = () => {
         </div>
       </div>
 
-      {showSubscriptionModal && creatorId && profile.price && (
+      {/* Subscription Modal */}
+      {showSubscriptionModal && selectedPlan && (
         <SubscriptionModal
           isOpen={showSubscriptionModal}
-          onClose={() => setShowSubscriptionModal(false)}
-          plan={{
-            name: "Monthly Subscription",
-            price: `₦${Number(profile.price).toLocaleString()}`
+          onClose={() => {
+            setShowSubscriptionModal(false);
+            setSelectedPlan(null);
           }}
-          creatorId={creatorId}
+          plan={selectedPlan}
+          creatorId={creatorId || ""}
           creatorName={displayName}
           onSuccess={handleSubscriptionSuccess}
         />

@@ -9,14 +9,13 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { getProfile } from "@/lib/profileData";
+import { Package } from "lucide-react";
 
 const sb = supabase as unknown as SupabaseClient<any>;
 
 const PremiumGallery = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const profile = getProfile(Number(id));
   const [selectedImage, setSelectedImage] = useState(0);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
@@ -24,15 +23,17 @@ const PremiumGallery = () => {
   const [hasSubscription, setHasSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creatorWalletAddress, setCreatorWalletAddress] = useState<string>();
+  const [premiumContent, setPremiumContent] = useState<any[]>([]);
+  const [creatorProfile, setCreatorProfile] = useState<any>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    if (user && id) {
       checkSubscriptionStatus();
-      checkPurchaseStatus();
       fetchWalletBalance();
-      fetchCreatorWallet();
+      fetchCreatorData();
+      fetchPremiumContent();
     } else {
       setLoading(false);
     }
@@ -42,40 +43,99 @@ const PremiumGallery = () => {
     if (!id || !user) return;
     
     try {
+      // Get creator ID first
+      const { data: creatorData } = await sb
+        .from("creators")
+        .select("id")
+        .eq("user_id", id)
+        .maybeSingle();
+
+      if (!creatorData) return;
+
       const { data, error } = await sb
         .from("subscriptions")
         .select("*")
-        .eq("user_id", user.id)
-        .eq("creator_id", id)
-        .eq("status", "active")
+        .eq("subscriber_id", user.id)
+        .eq("creator_id", creatorData.id)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (error) throw error;
-      setHasSubscription(!!data);
+      
+      // Check if subscription is still valid
+      if (data) {
+        const expiryDate = new Date(data.expires_at);
+        const now = new Date();
+        setHasSubscription(expiryDate > now);
+      } else {
+        setHasSubscription(false);
+      }
     } catch (error) {
       console.error("Error checking subscription status:", error);
+      setHasSubscription(false);
     }
   };
 
-  const checkPurchaseStatus = async () => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
+  const fetchCreatorData = async () => {
+    if (!id) return;
     
     try {
       const { data, error } = await sb
-        .from("purchases")
-        .select("id")
-        .eq("user_id", user?.id)
-        .eq("content_id", id)
-        .eq("status", "completed")
+        .from("profiles")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (!error && data) {
+        setCreatorProfile(data);
+      }
+
+      // Get creator wallet
+      const { data: creatorData } = await sb
+        .from("creators")
+        .select("wallet_address")
+        .eq("user_id", id)
         .maybeSingle();
 
-      if (error) throw error;
-      setHasPurchased(!!data);
+      if (creatorData) {
+        setCreatorWalletAddress(creatorData.wallet_address);
+      }
     } catch (error) {
-      console.error("Error checking purchase status:", error);
+      console.error("Error fetching creator data:", error);
+    }
+  };
+
+  const fetchPremiumContent = async () => {
+    if (!id) return;
+    
+    try {
+      // Get creator ID
+      const { data: creatorData } = await sb
+        .from("creators")
+        .select("id")
+        .eq("user_id", id)
+        .maybeSingle();
+
+      if (!creatorData) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch premium media
+      const { data: mediaData, error } = await sb
+        .from("media")
+        .select("*")
+        .eq("creator_id", creatorData.id)
+        .eq("is_premium", true)
+        .eq("status", "approved")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      
+      setPremiumContent(mediaData || []);
+    } catch (error) {
+      console.error("Error fetching premium content:", error);
+      setPremiumContent([]);
     } finally {
       setLoading(false);
     }
@@ -84,7 +144,7 @@ const PremiumGallery = () => {
   const fetchWalletBalance = async () => {
     try {
       const { data, error } = await sb
-        .from("user_wallets")
+        .from("wallets")
         .select("balance")
         .eq("user_id", user?.id)
         .maybeSingle();
@@ -96,24 +156,7 @@ const PremiumGallery = () => {
     }
   };
 
-  const fetchCreatorWallet = async () => {
-    if (!id) return;
-    
-    try {
-      const { data, error } = await sb
-        .from("creators")
-        .select("wallet_address")
-        .eq("user_id", id)
-        .maybeSingle();
-
-      if (error) throw error;
-      setCreatorWalletAddress(data?.wallet_address);
-    } catch (error) {
-      console.error("Error fetching creator wallet:", error);
-    }
-  };
-
-  const handlePurchaseClick = () => {
+  const handlePurchaseClick = (mediaId: string, price: number) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -123,16 +166,7 @@ const PremiumGallery = () => {
       return;
     }
 
-    if (!hasSubscription) {
-      toast({
-        title: "Subscription Required",
-        description: "You need to subscribe to this creator first before purchasing content.",
-        variant: "destructive",
-      });
-      navigate(`/profile/${id}`);
-      return;
-    }
-
+    // Can access via subscription OR individual purchase
     setIsPurchaseModalOpen(true);
   };
 
@@ -145,58 +179,6 @@ const PremiumGallery = () => {
     });
   };
 
-  // Mock premium content
-  const contentPrice = 9.99;
-  const premiumContent = [
-    {
-      id: 1,
-      type: "image",
-      url: profile.photos[0],
-      title: "Behind the Scenes",
-      likes: 142,
-      isNew: true
-    },
-    {
-      id: 2,
-      type: "video",
-      url: profile.photos[1],
-      title: "Exclusive Tutorial",
-      likes: 89,
-      isNew: false
-    },
-    {
-      id: 3,
-      type: "image",
-      url: profile.photos[2],
-      title: "Personal Moments",
-      likes: 203,
-      isNew: true
-    },
-    {
-      id: 4,
-      type: "image",
-      url: profile.photos[0],
-      title: "Photoshoot Preview",
-      likes: 156,
-      isNew: false
-    },
-    {
-      id: 5,
-      type: "video",
-      url: profile.photos[1],
-      title: "Live Stream Highlights",
-      likes: 98,
-      isNew: false
-    },
-    {
-      id: 6,
-      type: "image",
-      url: profile.photos[2],
-      title: "Daily Diary",
-      likes: 67,
-      isNew: true
-    }
-  ];
 
   if (loading) {
     return (
@@ -212,20 +194,38 @@ const PremiumGallery = () => {
     );
   }
 
+  if (!creatorProfile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-20 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-muted-foreground">Creator not found</p>
+            <Button onClick={() => navigate(-1)} className="mt-4">Go Back</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedContent = premiumContent[selectedImage] || premiumContent[0];
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      <PurchaseConfirmationModal
-        isOpen={isPurchaseModalOpen}
-        onClose={() => setIsPurchaseModalOpen(false)}
-        contentId={id || ""}
-        contentTitle={premiumContent[selectedImage].title}
-        price={contentPrice}
-        walletBalance={walletBalance}
-        onPurchaseSuccess={handlePurchaseSuccess}
-        creatorWalletAddress={creatorWalletAddress}
-      />
+      {selectedContent && (
+        <PurchaseConfirmationModal
+          isOpen={isPurchaseModalOpen}
+          onClose={() => setIsPurchaseModalOpen(false)}
+          contentId={selectedContent.id}
+          contentTitle={selectedContent.title}
+          price={selectedContent.price}
+          walletBalance={walletBalance}
+          onPurchaseSuccess={handlePurchaseSuccess}
+          creatorWalletAddress={creatorWalletAddress}
+        />
+      )}
       
       <div className="pt-20 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -245,17 +245,12 @@ const PremiumGallery = () => {
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-muted">
                 <Wallet className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">${walletBalance.toFixed(2)}</span>
+                <span className="text-sm font-medium">₦{walletBalance.toLocaleString()}</span>
               </div>
-              {hasPurchased ? (
+              {hasSubscription && (
                 <Badge className="gradient-primary text-white">
                   <Crown className="w-4 h-4 mr-1" />
-                  Owned
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="border-primary text-primary">
-                  <Lock className="w-4 h-4 mr-1" />
-                  ${contentPrice.toFixed(2)}
+                  Subscribed
                 </Badge>
               )}
             </div>
@@ -266,97 +261,103 @@ const PremiumGallery = () => {
             {/* Main Content */}
             <div className="lg:col-span-2">
               {/* Featured Content */}
-              <div className="glass-card rounded-3xl overflow-hidden mb-8 animate-fade-up">
-                <div className="relative aspect-video bg-gradient-to-r from-primary/20 to-secondary/20">
-                  {!hasPurchased && (
-                    <div className="absolute inset-0 backdrop-blur-xl bg-black/30 flex items-center justify-center z-10">
-                      <div className="text-center space-y-4">
-                        <Lock className="w-16 h-16 text-white mx-auto" />
+              {premiumContent.length > 0 ? (
+                <>
+                  <div className="glass-card rounded-3xl overflow-hidden mb-8 animate-fade-up">
+                    <div className="relative aspect-video bg-gradient-to-r from-primary/20 to-secondary/20">
+                      {!hasSubscription && (
+                        <div className="absolute inset-0 backdrop-blur-xl bg-black/30 flex items-center justify-center z-10">
+                          <div className="text-center space-y-4">
+                            <Lock className="w-16 h-16 text-white mx-auto" />
+                            <div>
+                              <p className="text-white text-xl font-semibold mb-2">Premium Content</p>
+                              <p className="text-white/80 mb-4">Subscribe to unlock all content</p>
+                              <Button
+                                onClick={() => navigate(`/profile/${id}`)}
+                                className="gradient-primary"
+                                size="lg"
+                              >
+                                <Crown className="w-5 h-5 mr-2" />
+                                Subscribe to {creatorProfile.display_name}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <img
+                        src={selectedContent.file_url}
+                        alt={selectedContent.title}
+                        className={`w-full h-full object-cover ${!hasSubscription ? 'blur-sm' : ''}`}
+                      />
+                      {selectedContent.type === "video" && hasSubscription && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-20 h-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-black/70 transition-smooth">
+                            <Play className="w-8 h-8 text-white ml-1" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
                         <div>
-                          <p className="text-white text-xl font-semibold mb-2">Premium Content</p>
-                          <p className="text-white/80 mb-4">Purchase to unlock and download</p>
-                          <Button
-                            onClick={handlePurchaseClick}
-                            className="gradient-primary"
-                            size="lg"
-                          >
-                            <Crown className="w-5 h-5 mr-2" />
-                            Purchase for ${contentPrice.toFixed(2)}
+                          <h2 className="text-2xl font-bold">{selectedContent.title}</h2>
+                          {selectedContent.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{selectedContent.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <Button variant="ghost" size="sm" disabled={!hasSubscription}>
+                            <Share2 className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" disabled={!hasSubscription}>
+                            <Download className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <img
-                    src={premiumContent[selectedImage].url}
-                    alt={premiumContent[selectedImage].title}
-                    className={`w-full h-full object-cover ${!hasPurchased ? 'blur-sm' : ''}`}
-                  />
-                  {premiumContent[selectedImage].type === "video" && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-20 h-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-black/70 transition-smooth">
-                        <Play className="w-8 h-8 text-white ml-1" />
-                      </div>
-                    </div>
-                  )}
-                  {premiumContent[selectedImage].isNew && (
-                    <div className="absolute top-4 left-4">
-                      <Badge className="bg-primary text-white">New</Badge>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold">{premiumContent[selectedImage].title}</h2>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-1">
-                        <Heart className="w-5 h-5 text-primary" />
-                        <span className="text-sm">{premiumContent[selectedImage].likes}</span>
-                      </div>
-                      <Button variant="ghost" size="sm" disabled={!hasPurchased}>
-                        <Share2 className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" disabled={!hasPurchased}>
-                        <Download className="w-4 h-4" />
-                      </Button>
+                      {selectedContent.price > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="font-semibold text-primary">₦{selectedContent.price.toLocaleString()}</span>
+                          {hasSubscription && " - Included in your subscription"}
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Content Grid */}
+                  <div className="grid grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "0.2s" }}>
+                    {premiumContent.map((content, index) => (
+                      <div
+                        key={content.id}
+                        className={`relative aspect-square cursor-pointer rounded-xl overflow-hidden transition-smooth hover-scale ${
+                          selectedImage === index ? "ring-2 ring-primary" : ""
+                        } ${!hasSubscription ? 'opacity-60' : ''}`}
+                        onClick={() => setSelectedImage(index)}
+                      >
+                        <img
+                          src={content.thumbnail_url || content.file_url}
+                          alt={content.title}
+                          className={`w-full h-full object-cover ${!hasSubscription ? 'blur-sm' : ''}`}
+                        />
+                        {!hasSubscription && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Lock className="w-6 h-6 text-white drop-shadow-lg" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-smooth" />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="glass-card rounded-3xl p-12 text-center">
+                  <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">No Premium Content Yet</h3>
                   <p className="text-muted-foreground">
-                    Exclusive content available only to premium subscribers. Thank you for your support! ✨
+                    This creator hasn't uploaded any premium content yet. Check back later!
                   </p>
                 </div>
-              </div>
-
-              {/* Content Grid */}
-              <div className="grid grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "0.2s" }}>
-                {premiumContent.map((content, index) => (
-                  <div
-                    key={content.id}
-                    className={`relative aspect-square cursor-pointer rounded-xl overflow-hidden transition-smooth hover-scale ${
-                      selectedImage === index ? "ring-2 ring-primary" : ""
-                    }`}
-                    onClick={() => setSelectedImage(index)}
-                  >
-                    <img
-                      src={content.url}
-                      alt={content.title}
-                      className="w-full h-full object-cover"
-                    />
-                    {content.type === "video" && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Play className="w-8 h-8 text-white drop-shadow-lg" />
-                      </div>
-                    )}
-                    {content.isNew && (
-                      <div className="absolute top-2 right-2">
-                        <div className="w-3 h-3 bg-primary rounded-full animate-pulse" />
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-smooth" />
-                  </div>
-                ))}
-              </div>
+              )}
             </div>
 
             {/* Sidebar */}
@@ -365,18 +366,18 @@ const PremiumGallery = () => {
               <div className="glass-card rounded-2xl p-6 animate-fade-up" style={{ animationDelay: "0.3s" }}>
                 <div className="text-center">
                   <img
-                    src={profile.image}
-                    alt={profile.name}
+                    src={creatorProfile.profile_image}
+                    alt={creatorProfile.display_name}
                     className="w-20 h-20 rounded-full mx-auto mb-4 object-cover"
                   />
-                  <h3 className="text-xl font-bold mb-2">{profile.name}'s Premium Gallery</h3>
+                  <h3 className="text-xl font-bold mb-2">{creatorProfile.display_name}'s Premium Gallery</h3>
                   <p className="text-muted-foreground text-sm mb-4">
-                    Exclusive content for subscribers only
+                    Exclusive content for subscribers
                   </p>
                   {!hasSubscription && (
                     <div className="mb-4 p-3 bg-primary/10 rounded-lg">
                       <p className="text-sm text-primary">
-                        Subscribe to {profile.name} to unlock content
+                        Subscribe to unlock all content
                       </p>
                       <Button
                         asChild
@@ -395,7 +396,13 @@ const PremiumGallery = () => {
                       <div className="text-xs text-muted-foreground">Items</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-secondary">3</div>
+                      <div className="text-2xl font-bold text-secondary">
+                        {premiumContent.filter(c => {
+                          const createdAt = new Date(c.created_at);
+                          const today = new Date();
+                          return createdAt.toDateString() === today.toDateString();
+                        }).length}
+                      </div>
                       <div className="text-xs text-muted-foreground">New Today</div>
                     </div>
                   </div>
@@ -434,14 +441,15 @@ const PremiumGallery = () => {
               <div className="glass-card rounded-2xl p-6 animate-fade-up" style={{ animationDelay: "0.5s" }}>
                 <h4 className="font-semibold mb-4">Quick Actions</h4>
                 <div className="space-y-3">
-                  {hasPurchased ? (
+                  {hasSubscription ? (
                     <>
                       <Button 
                         asChild
-                        className="w-full gradient-primary hover:opacity-90 transition-smooth"
+                        variant="outline"
+                        className="w-full bg-muted/50 border-border/50 hover:bg-muted transition-smooth"
                       >
-                        <Link to="/my-purchases">
-                          View All Purchases
+                        <Link to={`/messages/${id}`}>
+                          Send Message
                         </Link>
                       </Button>
                       <Button 
@@ -449,18 +457,18 @@ const PremiumGallery = () => {
                         variant="outline"
                         className="w-full bg-muted/50 border-border/50 hover:bg-muted transition-smooth"
                       >
-                        <Link to="/chat">
-                          Send Message
+                        <Link to={`/profile/${id}`}>
+                          View Profile
                         </Link>
                       </Button>
                     </>
                   ) : (
                     <Button 
-                      onClick={handlePurchaseClick}
+                      onClick={() => navigate(`/profile/${id}`)}
                       className="w-full gradient-primary hover:opacity-90 transition-smooth"
                     >
                       <Crown className="w-4 h-4 mr-2" />
-                      Unlock Content
+                      Subscribe Now
                     </Button>
                   )}
                 </div>

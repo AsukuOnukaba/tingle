@@ -14,8 +14,11 @@ interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   plan: {
+    id?: string;
     name: string;
-    price: string;
+    price: number;
+    duration_days: number;
+    features?: string[];
   };
   creatorId: string;
   creatorName: string;
@@ -36,14 +39,15 @@ export const SubscriptionModal = ({
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const basePrice = parseFloat(plan.price.replace('₦', '').replace(',', ''));
+  const basePrice = plan.price;
+  const planDuration = plan.duration_days;
   const annualDiscount = 0.15; // 15% discount for annual
   const monthlyPrice = basePrice;
   const annualPrice = basePrice * 12 * (1 - annualDiscount);
   const savings = basePrice * 12 - annualPrice;
 
   const selectedPrice = billingCycle === "monthly" ? monthlyPrice : annualPrice;
-  const durationDays = billingCycle === "monthly" ? 30 : 365;
+  const durationDays = billingCycle === "monthly" ? planDuration : 365;
 
   useEffect(() => {
     if (isOpen && user) {
@@ -98,6 +102,7 @@ export const SubscriptionModal = ({
         .upsert({
           subscriber_id: user.id,
           creator_id: creatorId,
+          plan_id: plan.id,
           amount_paid: selectedPrice,
           is_active: true,
           expires_at: expiresAt.toISOString(),
@@ -159,6 +164,7 @@ export const SubscriptionModal = ({
             .upsert({
               subscriber_id: user.id,
               creator_id: creatorId,
+              plan_id: plan.id,
               amount_paid: selectedPrice,
               is_active: true,
               expires_at: expiresAt.toISOString(),
