@@ -39,8 +39,8 @@ export const SubscriptionModal = ({
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const basePrice = plan.price;
-  const planDuration = plan.duration_days;
+  const basePrice = plan?.price || 0;
+  const planDuration = plan?.duration_days || 30;
   const annualDiscount = 0.15; // 15% discount for annual
   const monthlyPrice = basePrice;
   const annualPrice = basePrice * 12 * (1 - annualDiscount);
