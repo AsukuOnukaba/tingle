@@ -276,41 +276,65 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
     e.preventDefault();
     if (!newMessage.trim() || !currentProfileId || !recipientId) return;
 
-    const messagePayload = {
-      conversation_id: [currentProfileId, recipientId].sort().join("_"),
+    const messageText = newMessage.trim();
+    const conversationId = [currentProfileId, recipientId].sort().join("_");
+    
+    // Create optimistic message
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`,
+      text: messageText,
       sender_id: currentProfileId,
-      recipient_id: recipientId,
-      text: newMessage.trim(),
+      timestamp: new Date(),
       type: "text",
-      is_read: false,
       delivery_status: profile?.is_online ? 'delivered' : 'sent'
     };
-
-    const tempMessage = newMessage.trim();
+    
+    // Update UI immediately
+    setMessages(prev => [...prev, tempMessage]);
     setNewMessage("");
+    scrollToBottom();
+    
+    // Clear typing status
     updateTypingStatus(false);
 
     try {
-      const { error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("messages")
-        .insert([messagePayload]);
+        .insert({
+          conversation_id: conversationId,
+          sender_id: currentProfileId,
+          recipient_id: recipientId,
+          text: messageText,
+          type: "text",
+          is_read: false,
+          delivery_status: profile?.is_online ? 'delivered' : 'sent'
+        })
+        .select()
+        .single();
 
-      if (error) {
-        console.error("Error sending message:", error);
-        setNewMessage(tempMessage);
-        toast({
-          variant: "destructive",
-          title: "Failed to send message",
-          description: error.message || "Please try again."
-        });
-      }
-    } catch (err) {
-      console.error("Send message failed:", err);
-      setNewMessage(tempMessage);
+      if (error) throw error;
+
+      // Replace temp message with real one
+      setMessages(prev => prev.map(m => 
+        m.id === tempMessage.id ? {
+          id: String(data.id),
+          text: data.text,
+          sender_id: data.sender_id,
+          timestamp: new Date(data.created_at),
+          type: data.type as "text" | "tip",
+          delivery_status: data.delivery_status as "sent" | "delivered" | "read"
+        } : m
+      ));
+
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      // Remove temp message and restore input on error
+      setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+      setNewMessage(messageText);
       toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
         variant: "destructive",
-        title: "Failed to send message",
-        description: "Please try again."
       });
     }
   };

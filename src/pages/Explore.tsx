@@ -63,32 +63,61 @@ const Explore = () => {
     }
   );
 
-  // Fetch creators separately
-  const { data: creators, isLoading: isLoadingCreators } = useOptimizedQuery<CreatorData[]>(
+  // Fetch creators with their lowest plan price
+  const { data: creators, isLoading: isLoadingCreators } = useOptimizedQuery<any[]>(
     ["creators"],
     async () => {
       const { data, error } = await (supabase as any)
         .from("creators")
-        .select("user_id, status")
+        .select(`
+          user_id, 
+          status,
+          id
+        `)
         .eq("status", "approved");
       if (error) throw error;
-      return (data || []) as CreatorData[];
+      return (data || []);
+    }
+  );
+
+  // Fetch all subscription plans for creators
+  const { data: subscriptionPlans } = useOptimizedQuery<any[]>(
+    ["subscription_plans"],
+    async () => {
+      const { data, error } = await (supabase as any)
+        .from("subscription_plans")
+        .select("creator_id, name, price")
+        .eq("is_active", true)
+        .order("price", { ascending: true });
+      if (error) throw error;
+      return (data || []);
     }
   );
 
   const isLoading = isLoadingProfiles || isLoadingCreators;
 
-  // Create a map of creator statuses for quick lookup
+  // Create a map of creator IDs to their user_id
   const creatorMap = new Map(
-    (creators || []).map(c => [c.user_id, c.status])
+    (creators || []).map(c => [c.user_id, c])
   );
+
+  // Create a map of lowest plan prices per creator
+  const lowestPlanMap = new Map<string, any>();
+  (subscriptionPlans || []).forEach(plan => {
+    const existing = lowestPlanMap.get(plan.creator_id);
+    if (!existing || plan.price < existing.price) {
+      lowestPlanMap.set(plan.creator_id, plan);
+    }
+  });
 
   // Transform and filter profiles
   const filteredProfiles = (profiles || [])
     .map((profile) => {
-      const isCreator = creatorMap.get(profile.id) === 'approved';
-      // Only show price for approved creators
-      const showPrice = isCreator && profile.price && Number(profile.price) > 0;
+      const creator = creatorMap.get(profile.id);
+      const isCreator = creator?.status === 'approved';
+      
+      // Get lowest plan for this creator
+      const lowestPlan = isCreator ? lowestPlanMap.get(creator.id) : null;
       
       return {
         id: profile.id,
@@ -98,7 +127,7 @@ const Explore = () => {
         image: profile.profile_image || defaultProfile,
         isLocked: isCreator,
         rating: Number(profile.rating) || 4.8,
-        price: showPrice ? `₦${Number(profile.price).toLocaleString()}` : undefined,
+        price: lowestPlan ? `${lowestPlan.name} – ₦${Number(lowestPlan.price).toLocaleString()}/month` : undefined,
         isOnline: profile.is_online || false,
         isCreator: isCreator,
       };

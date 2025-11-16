@@ -59,12 +59,12 @@ const PremiumChat = () => {
         return;
       }
 
-      // Check if user has active subscription
+      // Check for active subscription to this creator
       const { data: subData, error: subError } = await sb
         .from("subscriptions")
-        .select("*")
+        .select("*, expires_at")
         .eq("subscriber_id", user.id)
-        .eq("creator_id", creatorData.id)
+        .eq("creator_id", id)
         .eq("is_active", true)
         .maybeSingle();
 

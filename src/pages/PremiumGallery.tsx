@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Download, Heart, Share2, Play, Lock, Crown, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { PurchaseConfirmationModal } from "@/components/PurchaseConfirmationModal";
@@ -202,6 +203,45 @@ const PremiumGallery = () => {
           <div className="text-center">
             <p className="text-muted-foreground">Creator not found</p>
             <Button onClick={() => navigate(-1)} className="mt-4">Go Back</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no premium content exists - NO subscription prompt
+  if (premiumContent.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-20 pb-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Button
+              asChild
+              variant="ghost"
+              className="mb-6 hover:bg-muted/50"
+            >
+              <Link to={`/profile/${id}`}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Profile
+              </Link>
+            </Button>
+
+            <Card className="p-8 text-center">
+              <Lock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <h2 className="text-2xl font-bold mb-2">No Premium Content Available</h2>
+              <p className="text-muted-foreground mb-6">
+                This creator hasn't uploaded any premium content yet.
+              </p>
+              <Button
+                asChild
+                className="w-full"
+              >
+                <Link to={`/profile/${id}`}>
+                  View Profile
+                </Link>
+              </Button>
+            </Card>
           </div>
         </div>
       </div>

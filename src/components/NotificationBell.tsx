@@ -29,7 +29,9 @@ export function NotificationBell() {
   useEffect(() => {
     if (user) {
       fetchNotifications();
+      fetchUnreadMessageCount();
       subscribeToNotifications();
+      subscribeToMessages();
     }
   }, [user]);
 
@@ -48,6 +50,63 @@ export function NotificationBell() {
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
+  };
+
+  // Fetch unread message count
+  const fetchUnreadMessageCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("messages" as any)
+        .select("id, sender_id", { count: 'exact' })
+        .eq("recipient_id", user?.id)
+        .eq("is_read", false);
+
+      if (error) throw error;
+      
+      // Count unique senders
+      const uniqueSenders = new Set((data || []).map((m: any) => m.sender_id));
+      const messageCount = uniqueSenders.size;
+      
+      // Add to notification count
+      const notifCount = notifications.filter((n: Notification) => !n.is_read).length;
+      setUnreadCount(notifCount + messageCount);
+    } catch (error) {
+      console.error("Error fetching unread messages:", error);
+    }
+  };
+
+  const subscribeToMessages = () => {
+    const channel = supabase
+      .channel("message_notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `recipient_id=eq.${user?.id}`,
+        },
+        () => {
+          fetchUnreadMessageCount();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `recipient_id=eq.${user?.id}`,
+        },
+        () => {
+          fetchUnreadMessageCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
   const subscribeToNotifications = () => {
