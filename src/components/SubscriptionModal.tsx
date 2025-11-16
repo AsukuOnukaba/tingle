@@ -13,13 +13,14 @@ import { toast } from "sonner";
 interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  plan: {
-    id?: string;
+  plans: Array<{
+    id: string;
     name: string;
     price: number;
     duration_days: number;
+    description?: string;
     features?: string[];
-  };
+  }>;
   creatorId: string;
   creatorName: string;
   onSuccess: () => void;
@@ -28,19 +29,28 @@ interface SubscriptionModalProps {
 export const SubscriptionModal = ({ 
   isOpen, 
   onClose, 
-  plan, 
+  plans, 
   creatorId,
   creatorName,
   onSuccess 
 }: SubscriptionModalProps) => {
   const { user } = useAuth();
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [paymentMethod, setPaymentMethod] = useState<"wallet" | "card">("wallet");
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const basePrice = plan?.price || 0;
-  const planDuration = plan?.duration_days || 30;
+  // Set first plan as default when modal opens
+  useEffect(() => {
+    if (plans.length > 0 && !selectedPlanId) {
+      setSelectedPlanId(plans[0].id);
+    }
+  }, [plans, selectedPlanId]);
+
+  const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  const basePrice = selectedPlan?.price || 0;
+  const planDuration = selectedPlan?.duration_days || 30;
   const annualDiscount = 0.15; // 15% discount for annual
   const monthlyPrice = basePrice;
   const annualPrice = basePrice * 12 * (1 - annualDiscount);
@@ -88,7 +98,7 @@ export const SubscriptionModal = ({
         p_user_id: user.id,
         p_amount: selectedPrice,
         p_reference: `SUB-${Date.now()}-${user.id.slice(0, 8)}`,
-        p_description: `${plan.name} subscription - ${billingCycle}`
+        p_description: `${selectedPlan?.name || 'subscription'} subscription - ${billingCycle}`
       });
 
       if (debitError) throw debitError;
@@ -102,7 +112,7 @@ export const SubscriptionModal = ({
         .upsert({
           subscriber_id: user.id,
           creator_id: creatorId,
-          plan_id: plan.id,
+          plan_id: selectedPlanId,
           amount_paid: selectedPrice,
           is_active: true,
           expires_at: expiresAt.toISOString(),
@@ -112,7 +122,7 @@ export const SubscriptionModal = ({
 
       if (subError) throw subError;
 
-      toast.success(`Successfully subscribed to ${plan.name}!`);
+      toast.success(`Successfully subscribed to ${selectedPlan?.name}!`);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -140,7 +150,7 @@ export const SubscriptionModal = ({
           reference,
           status: "pending",
           metadata: {
-            plan_name: plan.name,
+            plan_name: selectedPlan?.name,
             billing_cycle: billingCycle,
             duration_days: durationDays,
           },
@@ -164,7 +174,7 @@ export const SubscriptionModal = ({
             .upsert({
               subscriber_id: user.id,
               creator_id: creatorId,
-              plan_id: plan.id,
+              plan_id: selectedPlanId,
               amount_paid: selectedPrice,
               is_active: true,
               expires_at: expiresAt.toISOString(),
@@ -175,7 +185,7 @@ export const SubscriptionModal = ({
           if (subError) {
             toast.error("Payment successful but subscription failed. Please contact support.");
           } else {
-            toast.success(`Successfully subscribed to ${plan.name}!`);
+            toast.success(`Successfully subscribed to ${selectedPlan?.name}!`);
             onSuccess();
             onClose();
           }
@@ -201,17 +211,75 @@ export const SubscriptionModal = ({
     }
   };
 
+  if (plans.length === 0) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>No Subscription Plans Available</DialogTitle>
+            <DialogDescription>
+              This creator hasn't created any subscription plans yet. Please check back later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={onClose}>Close</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] glass-card max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] glass-card max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Subscribe to {creatorName}</DialogTitle>
           <DialogDescription>
-            Choose your billing cycle and payment method for {plan.name}
+            Choose your plan, billing cycle, and payment method
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Plan Selection */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Select a Plan</Label>
+            <RadioGroup value={selectedPlanId} onValueChange={setSelectedPlanId}>
+              <div className="space-y-3">
+                {plans.map((plan) => (
+                  <div key={plan.id} className="relative">
+                    <RadioGroupItem
+                      value={plan.id}
+                      id={plan.id}
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor={plan.id}
+                      className="flex flex-col p-4 border-2 rounded-lg cursor-pointer transition-all peer-checked:border-primary peer-checked:bg-primary/5 hover:bg-muted/50"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-lg">{plan.name}</span>
+                        <Badge variant="secondary">₦{plan.price.toLocaleString()}/month</Badge>
+                      </div>
+                      {plan.description && (
+                        <span className="text-sm text-muted-foreground">{plan.description}</span>
+                      )}
+                      {plan.features && plan.features.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {plan.features.map((feature, idx) => (
+                            <li key={idx} className="text-sm flex items-center gap-2">
+                              <span className="text-primary">✓</span>
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </RadioGroup>
+          </div>
+
           {/* Billing Cycle Selection */}
           <div className="space-y-3">
             <Label className="text-base font-semibold flex items-center">
@@ -296,7 +364,7 @@ export const SubscriptionModal = ({
           <div className="glass-card p-4 rounded-xl space-y-2 bg-primary/5">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Plan</span>
-              <span className="font-semibold">{plan.name}</span>
+              <span className="font-semibold">{selectedPlan?.name}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Billing</span>
