@@ -208,7 +208,9 @@ const Profile = () => {
       toast.error("This creator hasn't created any subscription plans yet.");
       return;
     }
-    setSelectedPlan(plan || creatorPlans[0]);
+    const planToUse = plan || creatorPlans[0];
+    console.log('Opening subscription modal with plan:', planToUse);
+    setSelectedPlan(planToUse);
     setShowSubscriptionModal(true);
   };
 

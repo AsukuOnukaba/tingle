@@ -279,20 +279,8 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
     const messageText = newMessage.trim();
     const conversationId = [currentProfileId, recipientId].sort().join("_");
     
-    // Create optimistic message
-    const tempMessage: Message = {
-      id: `temp-${Date.now()}`,
-      text: messageText,
-      sender_id: currentProfileId,
-      timestamp: new Date(),
-      type: "text",
-      delivery_status: profile?.is_online ? 'delivered' : 'sent'
-    };
-    
-    // Update UI immediately
-    setMessages(prev => [...prev, tempMessage]);
+    // Clear input immediately
     setNewMessage("");
-    scrollToBottom();
     
     // Clear typing status
     updateTypingStatus(false);
@@ -314,22 +302,11 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
 
       if (error) throw error;
 
-      // Replace temp message with real one
-      setMessages(prev => prev.map(m => 
-        m.id === tempMessage.id ? {
-          id: String(data.id),
-          text: data.text,
-          sender_id: data.sender_id,
-          timestamp: new Date(data.created_at),
-          type: data.type as "text" | "tip",
-          delivery_status: data.delivery_status as "sent" | "delivered" | "read"
-        } : m
-      ));
+      console.log('Message sent successfully:', data);
 
     } catch (error: any) {
       console.error("Error sending message:", error);
-      // Remove temp message and restore input on error
-      setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+      // Restore input on error
       setNewMessage(messageText);
       toast({
         title: "Error",
