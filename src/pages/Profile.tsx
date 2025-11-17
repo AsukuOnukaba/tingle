@@ -204,7 +204,11 @@ const Profile = () => {
       toast.error("This profile is not set up as a creator yet. Only approved creators can accept subscriptions.");
       return;
     }
-    // Always open modal - it will show "no plans" message if needed
+    if (creatorPlans.length === 0) {
+      toast.error("This creator hasn't created any subscription plans yet.");
+      return;
+    }
+    setSelectedPlan(plan || creatorPlans[0]);
     setShowSubscriptionModal(true);
   };
 
@@ -541,13 +545,14 @@ const Profile = () => {
       </div>
 
       {/* Subscription Modal */}
-      {showSubscriptionModal && (
+      {showSubscriptionModal && selectedPlan && (
         <SubscriptionModal
           isOpen={showSubscriptionModal}
           onClose={() => {
             setShowSubscriptionModal(false);
+            setSelectedPlan(null);
           }}
-          plans={creatorPlans}
+          plan={selectedPlan}
           creatorId={creatorId || ""}
           creatorName={displayName}
           onSuccess={handleSubscriptionSuccess}

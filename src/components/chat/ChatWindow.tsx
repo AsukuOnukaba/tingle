@@ -298,17 +298,11 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
     updateTypingStatus(false);
 
     try {
-      // Get current user session to ensure auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("You must be logged in to send messages");
-      }
-
       const { data, error } = await (supabase as any)
         .from("messages")
         .insert({
           conversation_id: conversationId,
-          sender_id: session.user.id, // Use session user ID for RLS
+          sender_id: currentProfileId,
           recipient_id: recipientId,
           text: messageText,
           type: "text",
