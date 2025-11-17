@@ -32,7 +32,6 @@ const Profile = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { setCurrentProfileId } = useCurrentProfile();
   const [activeTab, setActiveTab] = useState("photos");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [selectedTier, setSelectedTier] = useState(1);
@@ -47,13 +46,12 @@ const Profile = () => {
 
   useEffect(() => {
     if (id) {
-      setCurrentProfileId(id);
       fetchProfile(id);
       fetchCreatorId(id);
       checkSubscription();
       fetchUserPhotos(id);
     }
-  }, [id, setCurrentProfileId]);
+  }, [id]);
 
   useEffect(() => {
     if (creatorId) {
