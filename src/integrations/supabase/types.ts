@@ -197,6 +197,7 @@ export type Database = {
           total_earned: number | null
           updated_at: string | null
           user_id: string
+          wallet_address: string | null
         }
         Insert: {
           application_note?: string | null
@@ -209,6 +210,7 @@ export type Database = {
           total_earned?: number | null
           updated_at?: string | null
           user_id: string
+          wallet_address?: string | null
         }
         Update: {
           application_note?: string | null
@@ -221,6 +223,7 @@ export type Database = {
           total_earned?: number | null
           updated_at?: string | null
           user_id?: string
+          wallet_address?: string | null
         }
         Relationships: []
       }
