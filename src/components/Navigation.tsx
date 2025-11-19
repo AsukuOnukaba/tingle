@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
 import { Button } from "@/components/ui/button";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { Badge } from "@/components/ui/badge";
 
 const Navigation = () => {
   const location = useLocation();
@@ -13,6 +15,7 @@ const Navigation = () => {
   const { isAdmin, isCreator } = useRoles();
   const { currentProfileId } = useCurrentProfile();
   const [isOpen, setIsOpen] = useState(false);
+  const unreadCount = useUnreadCount();
 
   const handleLogout = async () => {
     await signOut();
@@ -52,13 +55,21 @@ const Navigation = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center space-x-1.5 lg:space-x-2 px-2 lg:px-3 py-2 rounded-lg transition-smooth hover-scale ${isActive
+                  className={`flex items-center space-x-1.5 lg:space-x-2 px-2 lg:px-3 py-2 rounded-lg transition-smooth hover-scale relative ${isActive
                       ? "gradient-primary text-white neon-glow"
                       : "text-muted-foreground hover:text-primary"
                     }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span className="text-xs lg:text-sm font-medium">{item.label}</span>
+                  {item.path === "/messages" && unreadCount > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px]"
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Badge>
+                  )}
                 </Link>
               );
             })}

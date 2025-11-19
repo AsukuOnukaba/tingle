@@ -10,7 +10,7 @@ import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { SubscriptionModal } from "@/components/SubscriptionModal";
+import { SubscriptionModalV2 } from "@/components/subscription/SubscriptionModalV2";
 import { ProfileReviews } from "@/components/ProfileReviews";
 import defaultProfile from "@/assets/profiles/profile-1.jpg";
 
@@ -546,17 +546,16 @@ const Profile = () => {
 
       {/* Subscription Modal */}
       {showSubscriptionModal && selectedPlan && (
-        <SubscriptionModal
-          isOpen={showSubscriptionModal}
-          onClose={() => {
-            setShowSubscriptionModal(false);
-            setSelectedPlan(null);
-          }}
-          plan={selectedPlan}
-          creatorId={creatorId || ""}
-          creatorName={displayName}
-          onSuccess={handleSubscriptionSuccess}
-        />
+      <SubscriptionModalV2
+        isOpen={showSubscriptionModal}
+        onClose={() => {
+          setShowSubscriptionModal(false);
+          setSelectedPlan(null);
+        }}
+        creatorId={creatorId || ""}
+        creatorName={displayName}
+        onSuccess={handleSubscriptionSuccess}
+      />
       )}
     </div>
   );

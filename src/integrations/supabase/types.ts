@@ -923,6 +923,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_unread_senders_count: { Args: { p_user_id: string }; Returns: number }
       handle_wallet_auth: {
         Args: {
           p_basename?: string
