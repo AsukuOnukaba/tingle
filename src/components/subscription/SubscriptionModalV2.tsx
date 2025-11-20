@@ -58,11 +58,13 @@ export const SubscriptionModalV2 = ({
         .from("creators")
         .select("id")
         .eq("user_id", creatorId)
-        .single();
+        .maybeSingle();
 
       if (creatorError) throw creatorError;
+      
       if (!creatorData) {
-        toast.error("Creator not found");
+        console.log("Creator not found for user_id:", creatorId);
+        setPlans([]);
         return;
       }
 

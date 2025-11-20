@@ -279,11 +279,27 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
     const messageText = newMessage.trim();
     const conversationId = [currentProfileId, recipientId].sort().join("_");
     
+    // Generate unique client ID for idempotency
+    const clientId = `${currentProfileId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Clear input immediately
     setNewMessage("");
     
     // Clear typing status
     updateTypingStatus(false);
+
+    // Optimistic message
+    const optimisticMsg: Message = {
+      id: clientId,
+      text: messageText,
+      sender_id: currentProfileId,
+      timestamp: new Date(),
+      type: "text",
+      delivery_status: "sent"
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    scrollToBottom();
 
     try {
       const { data, error } = await (supabase as any)
@@ -295,7 +311,8 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
           text: messageText,
           type: "text",
           is_read: false,
-          delivery_status: profile?.is_online ? 'delivered' : 'sent'
+          delivery_status: profile?.is_online ? 'delivered' : 'sent',
+          metadata: { client_id: clientId }
         })
         .select()
         .single();
@@ -304,15 +321,31 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
 
       console.log('Message sent successfully:', data);
 
+      // Replace optimistic message with real one
+      setMessages((prev) => prev.map(msg => 
+        msg.id === clientId ? {
+          ...msg,
+          id: data.id,
+          delivery_status: data.delivery_status
+        } : msg
+      ));
+
     } catch (error: any) {
       console.error("Error sending message:", error);
+      
+      // Mark message as failed - keep in UI for retry
+      setMessages((prev) => prev.map(msg => 
+        msg.id === clientId ? msg : msg
+      ));
+
+      toast({
+        variant: "destructive",
+        title: "Message Failed",
+        description: "Failed to send message. Please try again.",
+      });
+      
       // Restore input on error
       setNewMessage(messageText);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message",
-        variant: "destructive",
-      });
     }
   };
 
