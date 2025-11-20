@@ -68,24 +68,37 @@ const Messages = () => {
     try {
       setLoading(true);
 
+      // Fetch messages without foreign key joins
       const { data: messages, error } = await supabase
         .from("messages")
-        .select(`
-          *,
-          sender:profiles!messages_sender_id_fkey(id, display_name, profile_image, is_online),
-          recipient:profiles!messages_recipient_id_fkey(id, display_name, profile_image, is_online)
-        `)
+        .select("*")
         .or(`sender_id.eq.${user?.id},recipient_id.eq.${user?.id}`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
+      // Get unique user IDs from messages
+      const userIds = new Set<string>();
+      messages?.forEach((msg: any) => {
+        const otherUserId = msg.sender_id === user?.id ? msg.recipient_id : msg.sender_id;
+        userIds.add(otherUserId);
+      });
+
+      // Fetch profiles for all users in conversations
+      const { data: profiles, error: profilesError } = await (supabase as any)
+        .from("profiles")
+        .select("id, display_name, profile_image, is_online")
+        .in("id", Array.from(userIds));
+
+      if (profilesError) throw profilesError;
+
+      const profileMap = new Map((profiles as any[])?.map((p: any) => [p.id, p]) || []);
       const conversationMap = new Map<string, Conversation>();
 
       messages?.forEach((msg: any) => {
         const isReceiver = msg.recipient_id === user?.id;
         const otherUserId = isReceiver ? msg.sender_id : msg.recipient_id;
-        const otherUser = isReceiver ? msg.sender : msg.recipient;
+        const otherUser = profileMap.get(otherUserId) as any;
 
         if (!conversationMap.has(otherUserId)) {
           conversationMap.set(otherUserId, {
@@ -119,7 +132,7 @@ const Messages = () => {
       const { data, error } = await (supabase as any)
         .from("profiles")
         .select("id, display_name, profile_image, is_online")
-        .neq("id", user?.id)
+        .neq("id", user?.id || "")
         .limit(50);
 
       if (error) throw error;

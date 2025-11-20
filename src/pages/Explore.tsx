@@ -53,9 +53,13 @@ const Explore = () => {
   const { data: profiles, isLoading: isLoadingProfiles } = useOptimizedQuery<ProfileData[]>(
     ["profiles"],
     async () => {
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await (supabase as any)
         .from("profiles")
         .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at")
+        .neq("id", user?.id || "") // Exclude current user
         .order("rating", { ascending: false })
         .order("created_at", { ascending: true });
       if (error) throw error;
