@@ -53,17 +53,38 @@ export const SubscriptionModalV2 = ({
   const fetchPlans = async () => {
     setLoadingPlans(true);
     try {
+      // First check if user exists in profiles
+      const { data: profileData, error: profileError } = await (supabase as any)
+        .from("profiles")
+        .select("id")
+        .eq("id", creatorId)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+      
+      if (!profileData) {
+        console.error("Profile not found for user_id:", creatorId);
+        toast.error("Creator profile not found");
+        setPlans([]);
+        return;
+      }
+
       // Get creator record
       const { data: creatorData, error: creatorError } = await (supabase as any)
         .from("creators")
         .select("id")
         .eq("user_id", creatorId)
+        .eq("status", "approved")
         .maybeSingle();
 
-      if (creatorError) throw creatorError;
+      if (creatorError) {
+        console.error("Error fetching creator:", creatorError);
+        throw creatorError;
+      }
       
       if (!creatorData) {
-        console.log("Creator not found for user_id:", creatorId);
+        console.log("No approved creator found for user_id:", creatorId);
+        toast.error("This user is not an approved creator yet");
         setPlans([]);
         return;
       }
@@ -76,7 +97,10 @@ export const SubscriptionModalV2 = ({
         .eq("is_active", true)
         .order("price", { ascending: true });
 
-      if (plansError) throw plansError;
+      if (plansError) {
+        console.error("Error fetching plans:", plansError);
+        throw plansError;
+      }
 
       const formattedPlans = (plansData || []).map((plan: any) => ({
         ...plan,
@@ -85,13 +109,17 @@ export const SubscriptionModalV2 = ({
 
       setPlans(formattedPlans);
       
+      if (formattedPlans.length === 0) {
+        toast.error(`${creatorName} hasn't created any subscription plans yet`);
+      }
+      
       // Auto-select first plan if available
       if (formattedPlans.length > 0 && !selectedPlan) {
         setSelectedPlan(formattedPlans[0]);
       }
     } catch (error: any) {
       console.error("Error fetching plans:", error);
-      toast.error("Failed to load subscription plans");
+      toast.error(error.message || "Failed to load subscription plans");
     } finally {
       setLoadingPlans(false);
     }

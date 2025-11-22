@@ -40,9 +40,9 @@ const Messages = () => {
   }, [user]);
 
   useEffect(() => {
-    if (!recipientId || !user) return;
+    if (!user) return;
 
-    // Subscribe to new messages to update conversation list
+    // Subscribe to new messages to update conversation list immediately
     const channel = supabase
       .channel('messages_updates')
       .on(
@@ -51,9 +51,10 @@ const Messages = () => {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `recipient_id=eq.${user.id}`
+          filter: `sender_id=eq.${user.id},recipient_id=eq.${user.id}`
         },
         () => {
+          // Fetch conversations when any new message is sent or received
           fetchConversations();
         }
       )
@@ -62,7 +63,7 @@ const Messages = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [recipientId, user]);
+  }, [user]);
 
   const fetchConversations = async () => {
     try {
