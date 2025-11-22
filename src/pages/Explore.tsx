@@ -56,10 +56,19 @@ const Explore = () => {
       // Get current user ID
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Get admin user IDs to exclude
+      const { data: adminRoles } = await (supabase as any)
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+      
+      const adminIds = (adminRoles || []).map((r: any) => r.user_id);
+      const excludeIds = [...adminIds, user?.id || ""].filter(Boolean);
+      
       const { data, error } = await (supabase as any)
         .from("profiles")
         .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at")
-        .neq("id", user?.id || "") // Exclude current user
+        .not("id", "in", `(${excludeIds.join(',')})`) // Exclude current user and admins
         .order("rating", { ascending: false })
         .order("created_at", { ascending: true });
       if (error) throw error;

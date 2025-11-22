@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User } from "lucide-react";
+import { moderateText } from "@/lib/contentModeration";
+import { useChatRateLimiter } from "@/hooks/useChatRateLimiter";
 
 interface Message {
   id: string;
@@ -32,6 +34,7 @@ interface ChatWindowProps {
 const ChatWindow = ({ recipientId }: ChatWindowProps) => {
   const { currentProfileId } = useCurrentProfile();
   const { toast } = useToast();
+  const { checkRateLimit, recordAction } = useChatRateLimiter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -161,20 +164,45 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
           
           if (!isRelevant) return;
           
-          const newMessageObj: Message = {
-            id: String(newMsg.id),
-            text: newMsg.text ?? "",
-            sender_id: newMsg.sender_id,
-            timestamp: new Date(newMsg.created_at || Date.now()),
-            type: newMsg.type ?? "text",
-            delivery_status: newMsg.delivery_status ?? "sent"
-          };
+          // Check for duplicates by both id and client_id
+          setMessages((prev) => {
+            const existsById = prev.some(m => m.id === String(newMsg.id));
+            const existsByClientId = newMsg.metadata?.client_id && 
+              prev.some(m => m.id === newMsg.metadata.client_id);
+            
+            if (existsById) return prev;
+            
+            // If optimistic message exists, replace it
+            if (existsByClientId) {
+              return prev.map(m => 
+                m.id === newMsg.metadata.client_id ? {
+                  id: String(newMsg.id),
+                  text: newMsg.text ?? "",
+                  sender_id: newMsg.sender_id,
+                  timestamp: new Date(newMsg.created_at || Date.now()),
+                  type: newMsg.type ?? "text",
+                  delivery_status: newMsg.delivery_status ?? "sent"
+                } : m
+              );
+            }
+            
+            // Add new message
+            const newMessageObj: Message = {
+              id: String(newMsg.id),
+              text: newMsg.text ?? "",
+              sender_id: newMsg.sender_id,
+              timestamp: new Date(newMsg.created_at || Date.now()),
+              type: newMsg.type ?? "text",
+              delivery_status: newMsg.delivery_status ?? "sent"
+            };
+            
+            return [...prev, newMessageObj];
+          });
           
-          setMessages((prev) => [...prev, newMessageObj]);
           scrollToBottom();
 
           // Mark as delivered if we're the recipient
-          if (newMsg.recipient_id === currentProfileId) {
+          if (newMsg.recipient_id === currentProfileId && newMsg.delivery_status === 'sent') {
             await (supabase as any)
               .from("messages")
               .update({ 
@@ -277,6 +305,25 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
     if (!newMessage.trim() || !currentProfileId || !recipientId) return;
 
     const messageText = newMessage.trim();
+    
+    // Content moderation
+    const moderationResult = moderateText(messageText);
+    if (!moderationResult.isAllowed) {
+      toast({
+        variant: "destructive",
+        title: "Message Blocked",
+        description: moderationResult.warnings[0] || "This message violates community guidelines",
+      });
+      setNewMessage("");
+      return;
+    }
+
+    // Check rate limit
+    const canSend = await checkRateLimit();
+    if (!canSend) {
+      return; // Toast already shown by rate limiter
+    }
+
     const conversationId = [currentProfileId, recipientId].sort().join("_");
     
     // Generate unique client ID for idempotency
@@ -319,24 +366,34 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
 
       if (error) throw error;
 
-      console.log('Message sent successfully:', data);
+      // Record rate limit action
+      await recordAction();
 
-      // Replace optimistic message with real one
-      setMessages((prev) => prev.map(msg => 
-        msg.id === clientId ? {
-          ...msg,
-          id: data.id,
-          delivery_status: data.delivery_status
-        } : msg
-      ));
+      // Replace optimistic message with real one (prevent duplicates)
+      setMessages((prev) => {
+        const hasRealMessage = prev.some(m => m.id === data.id);
+        if (hasRealMessage) {
+          // Remove optimistic, keep real
+          return prev.filter(m => m.id !== clientId);
+        }
+        // Replace optimistic with real
+        return prev.map(msg => 
+          msg.id === clientId ? {
+            id: data.id,
+            text: data.text,
+            sender_id: data.sender_id,
+            timestamp: new Date(data.created_at),
+            type: data.type,
+            delivery_status: data.delivery_status
+          } : msg
+        );
+      });
 
     } catch (error: any) {
       console.error("Error sending message:", error);
       
-      // Mark message as failed - keep in UI for retry
-      setMessages((prev) => prev.map(msg => 
-        msg.id === clientId ? msg : msg
-      ));
+      // Remove optimistic message on failure
+      setMessages((prev) => prev.filter(m => m.id !== clientId));
 
       toast({
         variant: "destructive",
@@ -366,25 +423,105 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
   const handleTip = async (amount: string) => {
     if (!currentProfileId || !recipientId) return;
 
-    const tipPayload = {
-      conversation_id: [currentProfileId, recipientId].sort().join("_"),
-      text: `Sent a $${amount} tip`,
-      sender_id: currentProfileId,
-      recipient_id: recipientId,
-      type: "tip",
-      is_read: false,
-      delivery_status: profile?.is_online ? 'delivered' : 'sent'
-    };
+    // Convert USD to Naira (approximate rate: $1 = ₦1,600)
+    const usdAmount = parseFloat(amount);
+    const nairaAmount = Math.round(usdAmount * 1600);
 
     try {
-      await (supabase as any).from("messages").insert([tipPayload]);
+      // Check sender's wallet balance
+      const { data: senderWallet, error: walletError } = await (supabase as any)
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', currentProfileId)
+        .single();
+
+      if (walletError || !senderWallet) {
+        toast({
+          variant: "destructive",
+          title: "Wallet Error",
+          description: "Could not access your wallet. Please try again.",
+        });
+        return;
+      }
+
+      if (senderWallet.balance < nairaAmount) {
+        toast({
+          variant: "destructive",
+          title: "Insufficient Balance",
+          description: `You need ₦${nairaAmount.toLocaleString()} to send this tip. Your balance: ₦${senderWallet.balance.toLocaleString()}`,
+        });
+        return;
+      }
+
+      // Deduct from sender
+      const { error: deductError } = await (supabase as any)
+        .from('wallets')
+        .update({ balance: senderWallet.balance - nairaAmount })
+        .eq('user_id', currentProfileId);
+
+      if (deductError) throw deductError;
+
+      // Platform fee (30%)
+      const platformFee = Math.round(nairaAmount * 0.30);
+      const creatorAmount = nairaAmount - platformFee;
+
+      // Credit to recipient
+      const { data: recipientWallet } = await (supabase as any)
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', recipientId)
+        .single();
+
+      if (recipientWallet) {
+        await (supabase as any)
+          .from('wallets')
+          .update({ balance: recipientWallet.balance + creatorAmount })
+          .eq('user_id', recipientId);
+      }
+
+      // Record transaction
+      await (supabase as any)
+        .from('transactions')
+        .insert([
+          {
+            user_id: currentProfileId,
+            type: 'tip_sent',
+            amount: -nairaAmount,
+            description: `Tip sent to ${profile?.display_name}`,
+            status: 'completed'
+          },
+          {
+            user_id: recipientId,
+            type: 'tip_received',
+            amount: creatorAmount,
+            description: `Tip received (₦${nairaAmount.toLocaleString()})`,
+            status: 'completed'
+          }
+        ]);
+
+      // Create tip message
+      const conversationId = [currentProfileId, recipientId].sort().join("_");
+      await (supabase as any).from("messages").insert([{
+        conversation_id: conversationId,
+        text: `Sent a ₦${nairaAmount.toLocaleString()} tip`,
+        sender_id: currentProfileId,
+        recipient_id: recipientId,
+        type: "tip",
+        is_read: false,
+        delivery_status: profile?.is_online ? 'delivered' : 'sent'
+      }]);
       
       toast({
-        title: "Tip sent!",
-        description: `You sent $${amount} to ${profile?.display_name}`
+        title: "Tip Sent!",
+        description: `You sent ₦${nairaAmount.toLocaleString()} to ${profile?.display_name}`,
       });
     } catch (err) {
       console.error("Tip failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Tip Failed",
+        description: "Could not process tip. Please try again.",
+      });
     }
   };
 

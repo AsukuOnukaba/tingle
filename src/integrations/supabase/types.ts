@@ -410,6 +410,50 @@ export type Database = {
         }
         Relationships: []
       }
+      moderated_messages: {
+        Row: {
+          created_at: string
+          flagged_by: string | null
+          id: string
+          message_id: string
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          flagged_by?: string | null
+          id?: string
+          message_id: string
+          reason: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          flagged_by?: string | null
+          id?: string
+          message_id?: string
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderated_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -602,6 +646,33 @@ export type Database = {
           rating?: number | null
           updated_at?: string | null
           wallet_address?: string | null
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          action_count: number
+          action_type: string
+          created_at: string
+          id: string
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          action_count?: number
+          action_type: string
+          created_at?: string
+          id?: string
+          user_id: string
+          window_start?: string
+        }
+        Update: {
+          action_count?: number
+          action_type?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+          window_start?: string
         }
         Relationships: []
       }
@@ -905,6 +976,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_action_type: string
+          p_max_count: number
+          p_user_id: string
+          p_window_minutes: number
+        }
+        Returns: boolean
+      }
       credit_wallet: {
         Args: {
           p_amount: number
@@ -938,6 +1018,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      record_rate_limit: {
+        Args: { p_action_type: string; p_user_id: string }
+        Returns: undefined
       }
       send_notification: {
         Args: {

@@ -27,39 +27,76 @@ export const moderateText = (text: string): ModerationResult => {
 
   const lowerText = text.toLowerCase();
 
-  // Check for explicit offensive language
-  const offensivePatterns = [
-    /\b(fuck|shit|bitch|ass|damn|cunt|dick|pussy)\b/gi,
-    /\b(nigger|nigga|fag|retard)\b/gi,
-  ];
-
-  // Check for harassment patterns
+  // Enhanced harassment and bullying patterns
   const harassmentPatterns = [
-    /\b(kill yourself|kys|die|hurt yourself)\b/gi,
-    /\b(ugly|fat|stupid|worthless|loser)\b/gi,
+    /\b(kill yourself|kys|die|hurt yourself|suicide|hang yourself)\b/gi,
+    /\b(ugly|disgusting|hideous|repulsive|worthless|pathetic|loser)\b/gi,
+    /\b(nobody likes you|everyone hates you|waste of space)\b/gi,
+    /\b(fat|obese|pig|cow)\s*(ass|bitch|fuck|shit)?\b/gi,
+    /\b(stupid|dumb|idiot|moron|retard)\s*(bitch|fuck|ass)?\b/gi,
   ];
 
-  // Check for spam patterns
+  // Explicit offensive and hate speech
+  const offensivePatterns = [
+    /\b(fuck|shit|bitch|cunt|dick|pussy|cock|whore|slut)\b/gi,
+    /\b(nigger|nigga|fag|faggot|tranny)\b/gi,
+  ];
+
+  // Cyberbullying and intimidation
+  const bullyingPatterns = [
+    /\b(i will (find|get|hurt|beat|kill) you)\b/gi,
+    /\b(watch your back|you're dead|threat|attack)\b/gi,
+    /\b(exposed|leak|share your|post your)\s*(nudes|pictures|photos|address)\b/gi,
+  ];
+
+  // Sexual harassment
+  const sexualHarassmentPatterns = [
+    /\b(send (nudes|pics|photos)|show me your|wanna (fuck|sex))\b/gi,
+    /\b(dick pic|pussy pic|tits|boobs)\b/gi,
+  ];
+
+  // Spam and scam patterns
   const spamPatterns = [
-    /(click here|buy now|limited offer|act now)/gi,
-    /(http|https|www\.)[^\s]+/gi, // URLs
+    /(click here|buy now|limited offer|act now|make money fast)/gi,
+    /\b(http|https|www\.)[^\s]+/gi, // URLs
+    /(\$\$\$|!!!!!|FREE FREE FREE)/gi,
   ];
 
-  // Check offensive language
-  for (const pattern of offensivePatterns) {
+  // Check harassment (highest priority - block immediately)
+  for (const pattern of harassmentPatterns) {
     if (pattern.test(text)) {
-      result.warnings.push("Your content contains language that may violate community guidelines");
-      result.reasons.push("offensive_language");
+      result.isAllowed = false;
+      result.warnings.push("Your message contains harassment or bullying. This is not allowed.");
+      result.reasons.push("harassment");
       break;
     }
   }
 
-  // Check harassment
-  for (const pattern of harassmentPatterns) {
+  // Check bullying/threats
+  for (const pattern of bullyingPatterns) {
     if (pattern.test(text)) {
       result.isAllowed = false;
-      result.warnings.push("Your content appears to contain harassment or hate speech");
-      result.reasons.push("harassment");
+      result.warnings.push("Your message contains threats or intimidation. This is not allowed.");
+      result.reasons.push("bullying");
+      break;
+    }
+  }
+
+  // Check sexual harassment
+  for (const pattern of sexualHarassmentPatterns) {
+    if (pattern.test(text)) {
+      result.isAllowed = false;
+      result.warnings.push("Your message contains inappropriate sexual content. This is not allowed.");
+      result.reasons.push("sexual_harassment");
+      break;
+    }
+  }
+
+  // Check offensive language (warning, but allow)
+  for (const pattern of offensivePatterns) {
+    if (pattern.test(text)) {
+      result.warnings.push("Your message contains offensive language that may violate community guidelines");
+      result.reasons.push("offensive_language");
       break;
     }
   }
@@ -67,7 +104,7 @@ export const moderateText = (text: string): ModerationResult => {
   // Check spam
   for (const pattern of spamPatterns) {
     if (pattern.test(text)) {
-      result.warnings.push("Your content may be flagged as spam");
+      result.warnings.push("Your message may be flagged as spam");
       result.reasons.push("spam");
       break;
     }
