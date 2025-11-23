@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Gift, Image, Smile, MoreVertical, Check, CheckCheck } from "lucide-react";
+import { Send, Gift, Image, Smile, MoreVertical, Check, CheckCheck, ArrowLeft, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,9 +29,10 @@ interface Profile {
 
 interface ChatWindowProps {
   recipientId: string;
+  onBack?: () => void;
 }
 
-const ChatWindow = ({ recipientId }: ChatWindowProps) => {
+const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
   const { currentProfileId } = useCurrentProfile();
   const { toast } = useToast();
   const { checkRateLimit, recordAction } = useChatRateLimiter();
@@ -164,29 +165,18 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
           
           if (!isRelevant) return;
           
-          // Check for duplicates by both id and client_id
+          // Check for duplicates - only check by real ID, optimistic replacement happens in handleSendMessage
           setMessages((prev) => {
             const existsById = prev.some(m => m.id === String(newMsg.id));
-            const existsByClientId = newMsg.metadata?.client_id && 
-              prev.some(m => m.id === newMsg.metadata.client_id);
-            
             if (existsById) return prev;
             
-            // If optimistic message exists, replace it
-            if (existsByClientId) {
-              return prev.map(m => 
-                m.id === newMsg.metadata.client_id ? {
-                  id: String(newMsg.id),
-                  text: newMsg.text ?? "",
-                  sender_id: newMsg.sender_id,
-                  timestamp: new Date(newMsg.created_at || Date.now()),
-                  type: newMsg.type ?? "text",
-                  delivery_status: newMsg.delivery_status ?? "sent"
-                } : m
-              );
+            // If this message was sent by current user, it's already added optimistically
+            // Don't add it again from realtime
+            if (newMsg.sender_id === currentProfileId) {
+              return prev;
             }
             
-            // Add new message
+            // Add new message from other user
             const newMessageObj: Message = {
               id: String(newMsg.id),
               text: newMsg.text ?? "",
@@ -369,25 +359,19 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
       // Record rate limit action
       await recordAction();
 
-      // Replace optimistic message with real one (prevent duplicates)
-      setMessages((prev) => {
-        const hasRealMessage = prev.some(m => m.id === data.id);
-        if (hasRealMessage) {
-          // Remove optimistic, keep real
-          return prev.filter(m => m.id !== clientId);
-        }
-        // Replace optimistic with real
-        return prev.map(msg => 
+      // Replace optimistic message with real one
+      setMessages((prev) => 
+        prev.map(msg => 
           msg.id === clientId ? {
-            id: data.id,
+            id: String(data.id),
             text: data.text,
             sender_id: data.sender_id,
             timestamp: new Date(data.created_at),
             type: data.type,
             delivery_status: data.delivery_status
           } : msg
-        );
-      });
+        )
+      );
 
     } catch (error: any) {
       console.error("Error sending message:", error);
@@ -546,6 +530,11 @@ const ChatWindow = ({ recipientId }: ChatWindowProps) => {
       <div className="glass-card border-b border-border/50 px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            {onBack && (
+              <Button variant="ghost" size="sm" onClick={onBack} className="md:hidden mr-2">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            )}
             {profile && (
               <>
                 <div className="relative">

@@ -159,7 +159,7 @@ const Wallet = () => {
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
                     <p className="text-3xl md:text-4xl font-bold">
-                      ${wallet?.balance.toFixed(2) || "0.00"}
+                      ₦{wallet?.balance.toFixed(2) || "0.00"}
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -338,9 +338,9 @@ const Wallet = () => {
                        <p className={`text-lg font-bold ${
                         transaction.type === 'credit' ? 'text-green-500' : 'text-red-500'
                       }`}>
-                        {transaction.type === 'credit' ? '+' : '-'}
-                        ${transaction.amount.toFixed(2)}
-                      </p>
+                         {transaction.type === 'credit' ? '+' : '-'}
+                         ₦{transaction.amount.toFixed(2)}
+                       </p>
                     </div>
                   ))}
                 </div>

@@ -178,7 +178,7 @@ const Messages = () => {
 
       <div className="pt-16 h-screen flex">
         {/* Left Sidebar - Conversations List */}
-        <div className="w-full md:w-96 border-r border-border/50 flex flex-col bg-background">
+        <div className={`w-full md:w-96 border-r border-border/50 flex flex-col bg-background ${recipientId ? 'hidden md:flex' : 'flex'}`}>
           {/* Header */}
           <div className="p-4 border-b border-border/50">
             <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -324,9 +324,9 @@ const Messages = () => {
         </div>
 
         {/* Right Side - Chat Window */}
-        <div className="flex-1 hidden md:flex">
+        <div className={`flex-1 ${recipientId ? 'flex' : 'hidden md:flex'}`}>
           {recipientId ? (
-            <ChatWindow recipientId={recipientId} />
+            <ChatWindow recipientId={recipientId} onBack={() => navigate('/messages')} />
           ) : (
             <div className="flex-1 flex items-center justify-center bg-muted/20">
               <div className="text-center">
