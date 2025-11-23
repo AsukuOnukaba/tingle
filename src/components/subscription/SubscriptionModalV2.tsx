@@ -52,6 +52,8 @@ export const SubscriptionModalV2 = ({
 
   const fetchPlans = async () => {
     setLoadingPlans(true);
+    console.log('🔍 SubscriptionModalV2: Fetching plans for creatorId (user_id):', creatorId);
+    
     try {
       // First check if user exists in profiles
       const { data: profileData, error: profileError } = await (supabase as any)
@@ -60,36 +62,43 @@ export const SubscriptionModalV2 = ({
         .eq("id", creatorId)
         .maybeSingle();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('❌ Profile fetch error:', profileError);
+        throw profileError;
+      }
       
       if (!profileData) {
-        console.error("Profile not found for user_id:", creatorId);
+        console.error("❌ Profile not found for user_id:", creatorId);
         toast.error("Creator profile not found");
         setPlans([]);
         return;
       }
 
+      console.log('✅ Profile found:', profileData);
+
       // Get creator record
       const { data: creatorData, error: creatorError } = await (supabase as any)
         .from("creators")
-        .select("id")
+        .select("id, user_id, display_name, status")
         .eq("user_id", creatorId)
         .eq("status", "approved")
         .maybeSingle();
 
       if (creatorError) {
-        console.error("Error fetching creator:", creatorError);
+        console.error("❌ Creator fetch error:", creatorError);
         throw creatorError;
       }
       
       if (!creatorData) {
-        console.log("No approved creator found for user_id:", creatorId);
+        console.log("❌ No approved creator found for user_id:", creatorId);
         toast.error("This user is not an approved creator yet");
         setPlans([]);
         return;
       }
 
-      // Fetch plans
+      console.log('✅ Creator found:', creatorData);
+
+      // Fetch plans using the creator's internal ID
       const { data: plansData, error: plansError } = await (supabase as any)
         .from("subscription_plans")
         .select("*")
@@ -98,9 +107,11 @@ export const SubscriptionModalV2 = ({
         .order("price", { ascending: true });
 
       if (plansError) {
-        console.error("Error fetching plans:", plansError);
+        console.error("❌ Plans fetch error:", plansError);
         throw plansError;
       }
+
+      console.log(`✅ Found ${plansData?.length || 0} plans:`, plansData);
 
       const formattedPlans = (plansData || []).map((plan: any) => ({
         ...plan,
@@ -111,6 +122,8 @@ export const SubscriptionModalV2 = ({
       
       if (formattedPlans.length === 0) {
         toast.error(`${creatorName} hasn't created any subscription plans yet`);
+      } else {
+        console.log('✅ Plans loaded successfully:', formattedPlans.length);
       }
       
       // Auto-select first plan if available
@@ -118,7 +131,7 @@ export const SubscriptionModalV2 = ({
         setSelectedPlan(formattedPlans[0]);
       }
     } catch (error: any) {
-      console.error("Error fetching plans:", error);
+      console.error("❌ Error fetching plans:", error);
       toast.error(error.message || "Failed to load subscription plans");
     } finally {
       setLoadingPlans(false);

@@ -104,13 +104,15 @@ const Profile = () => {
     try {
       const { data, error } = await (supabase as any)
         .from('creators')
-        .select('id')
+        .select('id, user_id')
         .eq('user_id', profileIdParam)
         .eq('status', 'approved')
         .maybeSingle();
 
       if (data && !error) {
-        setCreatorId(data.id);
+        // Store the creator's internal ID for plan fetching
+        // But we'll pass user_id to the subscription modal
+        setCreatorId(data.user_id);
       }
     } catch (error) {
       console.error('Error fetching creator:', error);
@@ -121,10 +123,21 @@ const Profile = () => {
     if (!creatorId) return;
     
     try {
+      // First get the creator's internal ID
+      const { data: creatorData } = await (supabase as any)
+        .from('creators')
+        .select('id')
+        .eq('user_id', creatorId)
+        .eq('status', 'approved')
+        .maybeSingle();
+
+      if (!creatorData) return;
+
+      // Then fetch plans using the internal creator ID
       const { data, error } = await (supabase as any)
         .from('subscription_plans')
         .select('*')
-        .eq('creator_id', creatorId)
+        .eq('creator_id', creatorData.id)
         .eq('is_active', true)
         .order('price', { ascending: true });
 
@@ -196,6 +209,7 @@ const Profile = () => {
   const handleSubscribe = (plan?: any) => {
     if (!user) {
       toast.error("Please login to subscribe");
+      navigate("/login");
       return;
     }
     if (!creatorId) {
@@ -203,11 +217,11 @@ const Profile = () => {
       return;
     }
     if (creatorPlans.length === 0) {
-      toast.error("This creator hasn't created any subscription plans yet.");
+      toast.error("This creator hasn't created any subscription plans yet. Check back later!");
       return;
     }
     const planToUse = plan || creatorPlans[0];
-    console.log('Opening subscription modal with plan:', planToUse);
+    console.log('Opening subscription modal for creator user_id:', creatorId, 'with plan:', planToUse);
     setSelectedPlan(planToUse);
     setShowSubscriptionModal(true);
   };
