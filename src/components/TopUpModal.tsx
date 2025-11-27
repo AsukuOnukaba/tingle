@@ -34,6 +34,7 @@ declare global {
 export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) => {
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedGateway, setSelectedGateway] = useState<'paystack' | 'flutterwave'>('paystack');
   const { toast } = useToast();
 
   const handleTopUp = async () => {
@@ -59,64 +60,72 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
 
       const reference = `TOP-${Date.now()}-${user.id.substring(0, 8)}`;
 
-      // Show loading toast
+      // Initialize payment via edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const initResponse = await supabase.functions.invoke("initiate-payment", {
+        body: { 
+          amount: amountValue,
+          gateway: selectedGateway 
+        },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (initResponse.error) {
+        throw new Error(initResponse.error.message || 'Failed to initialize payment');
+      }
+
+      const { payment_url, reference: paymentRef } = initResponse.data;
+
+      // Open payment URL in new window
+      const paymentWindow = window.open(payment_url, '_blank', 'width=600,height=700');
+      
+      if (!paymentWindow) {
+        throw new Error('Please allow popups to complete payment');
+      }
+
+      // Poll for payment completion
       toast({
-        title: "Opening Payment Gateway",
-        description: "Please wait while we prepare your secure payment...",
+        title: "Payment Gateway Opened",
+        description: "Complete your payment in the new window",
       });
 
-      // Initialize Paystack payment
-      // NOTE: This is a test key. In production, move to environment variable:
-      // VITE_PAYSTACK_PUBLIC_KEY in .env file
-      const handler = globalThis.PaystackPop.setup({
-        key: 'pk_live_acee15f7955261c2f143e862b128dbd2de4343ac',
-        email: user.email,
-        amount: amountValue * 100, // kobo
-        ref: reference,
-        onClose: () => {
-          setLoading(false);
-        },
-        callback: (response) => {
-          console.log("Payment successful:", response);
+      const pollInterval = setInterval(async () => {
+        try {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          
+          const verifyResponse = await supabase.functions.invoke("wallet-topup", {
+            body: { reference: paymentRef },
+            headers: {
+              Authorization: `Bearer ${currentSession?.access_token}`,
+            },
+          });
 
-          // Wrap async logic in an IIFE
-          (async () => {
-            try {
-              // Get session for auth
-              const { data: { session } } = await supabase.auth.getSession();
+          if (!verifyResponse.error) {
+            clearInterval(pollInterval);
+            setLoading(false);
+            
+            toast({
+              title: "Top-up Successful",
+              description: `Your wallet has been credited with ₦${amountValue.toLocaleString()}`,
+            });
 
-              const verifyResponse = await supabase.functions.invoke("wallet-topup", {
-                body: { reference: response.reference },
-                headers: {
-                  Authorization: `Bearer ${session?.access_token}`,
-                },
-              });
+            setAmount("");
+            onOpenChange(false);
+            onSuccess?.();
+          }
+        } catch (error) {
+          // Payment not yet completed, continue polling
+        }
+      }, 3000);
 
-              if (verifyResponse.error) throw verifyResponse.error;
-
-              toast({
-                title: "Top-up Successful",
-                description: `Your wallet has been credited with $${amountValue}`,
-              });
-
-              setAmount("");
-              onOpenChange(false);
-              onSuccess?.();
-            } catch (error) {
-              console.error("Verification error:", error);
-              toast({
-                title: "Top-up Failed",
-                description: error instanceof Error ? error.message : "Failed to process top-up",
-                variant: "destructive",
-              });
-            } finally {
-              setLoading(false);
-            }
-          })();
-        },
-      });
-
-      handler.openIframe();
+      // Stop polling after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setLoading(false);
+      }, 5 * 60 * 1000);
     } catch (error) {
       console.error('Top-up error:', error);
       toast({
@@ -150,22 +159,53 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
 
           <TabsContent value="card" className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount (USD)</Label>
+              <Label htmlFor="amount">Amount (NGN)</Label>
               <Input
                 id="amount"
                 type="number"
-                placeholder="Enter amount"
+                placeholder="Enter amount in Naira"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 min="0"
-                step="0.01"
+                step="1"
                 disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">
+                Minimum: ₦500
+              </p>
             </div>
+            
+            <div className="space-y-2">
+              <Label>Payment Gateway</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={selectedGateway === 'paystack' ? 'default' : 'outline'}
+                  onClick={() => setSelectedGateway('paystack')}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  Paystack
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedGateway === 'flutterwave' ? 'default' : 'outline'}
+                  onClick={() => setSelectedGateway('flutterwave')}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  Flutterwave
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Both gateways support cards, bank transfer, and USSD
+              </p>
+            </div>
+
             <Button
               onClick={handleTopUp}
               className="w-full gradient-primary"
-              disabled={loading || !amount}
+              disabled={loading || !amount || parseFloat(amount) < 500}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Proceed to Payment

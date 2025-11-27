@@ -67,7 +67,7 @@ serve(async (req) => {
     expiresAt.setDate(expiresAt.getDate() + plan.duration_days);
 
     // Create or update subscription
-    const { error: subError } = await supabaseClient
+    const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .upsert({
         subscriber_id: user.id,
@@ -78,11 +78,52 @@ serve(async (req) => {
         expires_at: expiresAt.toISOString(),
       }, {
         onConflict: 'subscriber_id,creator_id'
-      });
+      })
+      .select()
+      .single();
 
     if (subError) {
       console.error('Subscription error:', subError);
       throw subError;
+    }
+
+    // Create subscription entitlements for premium features
+    const entitlements = [
+      {
+        subscription_id: subscription.id,
+        user_id: user.id,
+        creator_id: creator_id,
+        entitlement_type: 'premium_chat',
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      },
+      {
+        subscription_id: subscription.id,
+        user_id: user.id,
+        creator_id: creator_id,
+        entitlement_type: 'premium_content',
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      },
+      {
+        subscription_id: subscription.id,
+        user_id: user.id,
+        creator_id: creator_id,
+        entitlement_type: 'priority_messages',
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      }
+    ];
+
+    const { error: entitlementsError } = await supabaseClient
+      .from('subscription_entitlements')
+      .upsert(entitlements, {
+        onConflict: 'subscription_id,entitlement_type'
+      });
+
+    if (entitlementsError) {
+      console.error('Entitlements creation error:', entitlementsError);
+      // Don't fail the subscription, just log the error
     }
 
     // Update payment intent status
