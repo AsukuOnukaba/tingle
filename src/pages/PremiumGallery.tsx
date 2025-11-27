@@ -44,32 +44,46 @@ const PremiumGallery = () => {
     if (!id || !user) return;
     
     try {
-      // Get creator ID first
-      const { data: creatorData } = await sb
-        .from("creators")
-        .select("id")
-        .eq("user_id", id)
-        .maybeSingle();
+      // Check premium content access using entitlements
+      const { data: hasAccess, error: accessError } = await sb
+        .rpc('check_premium_chat_access', {
+          p_user_id: user.id,
+          p_creator_id: id
+        });
 
-      if (!creatorData) return;
+      if (accessError) {
+        console.error('Access check error:', accessError);
+        // Fall back to checking subscriptions directly
+        const { data: creatorData } = await sb
+          .from("creators")
+          .select("id")
+          .eq("user_id", id)
+          .maybeSingle();
 
-      const { data, error } = await sb
-        .from("subscriptions")
-        .select("*")
-        .eq("subscriber_id", user.id)
-        .eq("creator_id", creatorData.id)
-        .eq("is_active", true)
-        .maybeSingle();
+        if (!creatorData) {
+          setHasSubscription(false);
+          return;
+        }
 
-      if (error) throw error;
-      
-      // Check if subscription is still valid
-      if (data) {
-        const expiryDate = new Date(data.expires_at);
-        const now = new Date();
-        setHasSubscription(expiryDate > now);
+        const { data, error } = await sb
+          .from("subscriptions")
+          .select("*")
+          .eq("subscriber_id", user.id)
+          .eq("creator_id", creatorData.id)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (error) throw error;
+        
+        if (data) {
+          const expiryDate = new Date(data.expires_at);
+          const now = new Date();
+          setHasSubscription(expiryDate > now);
+        } else {
+          setHasSubscription(false);
+        }
       } else {
-        setHasSubscription(false);
+        setHasSubscription(hasAccess || false);
       }
     } catch (error) {
       console.error("Error checking subscription status:", error);

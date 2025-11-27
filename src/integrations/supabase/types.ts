@@ -493,6 +493,7 @@ export type Database = {
           created_at: string | null
           creator_id: string | null
           currency: string | null
+          gateway: string | null
           id: string
           metadata: Json | null
           payment_provider: string | null
@@ -507,6 +508,7 @@ export type Database = {
           created_at?: string | null
           creator_id?: string | null
           currency?: string | null
+          gateway?: string | null
           id?: string
           metadata?: Json | null
           payment_provider?: string | null
@@ -521,6 +523,7 @@ export type Database = {
           created_at?: string | null
           creator_id?: string | null
           currency?: string | null
+          gateway?: string | null
           id?: string
           metadata?: Json | null
           payment_provider?: string | null
@@ -676,6 +679,50 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_entitlements: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          entitlement_type: string
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          subscription_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          entitlement_type: string
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          subscription_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          entitlement_type?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          subscription_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_entitlements_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
           created_at: string | null
@@ -776,7 +823,9 @@ export type Database = {
           amount: number
           balance_after: number
           created_at: string | null
+          gateway: string | null
           id: string
+          idempotency_key: string | null
           metadata: Json | null
           payment_provider: string | null
           reference: string | null
@@ -789,7 +838,9 @@ export type Database = {
           amount: number
           balance_after: number
           created_at?: string | null
+          gateway?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json | null
           payment_provider?: string | null
           reference?: string | null
@@ -802,7 +853,9 @@ export type Database = {
           amount?: number
           balance_after?: number
           created_at?: string | null
+          gateway?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json | null
           payment_provider?: string | null
           reference?: string | null
@@ -976,6 +1029,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_premium_chat_access: {
+        Args: { p_creator_id: string; p_user_id: string }
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: {
           p_action_type: string

@@ -46,52 +46,42 @@ const PremiumChat = () => {
       if (profileError) throw profileError;
       setCreatorProfile(profileData);
 
-      // Get creator ID
-      const { data: creatorData, error: creatorError } = await sb
-        .from("creators")
-        .select("id")
-        .eq("user_id", id)
-        .eq("status", "approved")
-        .maybeSingle();
+      // Check premium chat access using the new entitlements system
+      const { data: hasAccess, error: accessError } = await sb
+        .rpc('check_premium_chat_access', {
+          p_user_id: user.id,
+          p_creator_id: id
+        });
 
-      if (creatorError) throw creatorError;
+      if (accessError) {
+        console.error('Access check error:', accessError);
+        // Fall back to checking subscriptions directly
+        const { data: subData, error: subError } = await sb
+          .from("subscriptions")
+          .select("*, expires_at")
+          .eq("subscriber_id", user.id)
+          .eq("creator_id", id)
+          .eq("is_active", true)
+          .maybeSingle();
 
-      if (!creatorData) {
-        toast.error("This user is not a creator");
+        if (subError) throw subError;
+
+        if (!subData || new Date(subData.expires_at) < new Date()) {
+          toast.error("Premium chat requires an active subscription");
+          navigate(`/profile/${id}`);
+          return;
+        }
+
+        setHasSubscription(true);
+      } else if (!hasAccess) {
+        toast.error("Premium chat requires an active subscription with chat access");
         navigate(`/profile/${id}`);
         return;
+      } else {
+        setHasSubscription(true);
       }
 
-      // Check for active subscription to this creator
-      const { data: subData, error: subError } = await sb
-        .from("subscriptions")
-        .select("*, expires_at")
-        .eq("subscriber_id", user.id)
-        .eq("creator_id", id)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (subError) throw subError;
-
-      if (!subData) {
-        toast.error("Premium chat requires an active subscription");
-        navigate(`/profile/${id}`);
-        return;
-      }
-
-      // Check if subscription is still valid
-      const expiryDate = new Date(subData.expires_at);
-      const now = new Date();
-
-      if (expiryDate < now) {
-        toast.error("Your subscription has expired. Please renew to access premium chat.");
-        navigate(`/profile/${id}`);
-        return;
-      }
-
-      setHasSubscription(true);
       setLoading(false);
-      // Don't redirect - stay on this page with premium access
     } catch (error: any) {
       console.error("Error checking access:", error);
       toast.error(error.message || "Failed to verify access");
