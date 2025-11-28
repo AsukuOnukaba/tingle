@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      blockchain_transactions: {
+        Row: {
+          amount: number
+          block_number: number | null
+          chain: string
+          created_at: string | null
+          direction: string
+          from_address: string
+          gas_price: number | null
+          gas_used: number | null
+          id: string
+          metadata: Json | null
+          status: string
+          to_address: string
+          token: string
+          tx_hash: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          block_number?: number | null
+          chain: string
+          created_at?: string | null
+          direction: string
+          from_address: string
+          gas_price?: number | null
+          gas_used?: number | null
+          id?: string
+          metadata?: Json | null
+          status?: string
+          to_address: string
+          token: string
+          tx_hash: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          block_number?: number | null
+          chain?: string
+          created_at?: string | null
+          direction?: string
+          from_address?: string
+          gas_price?: number | null
+          gas_used?: number | null
+          id?: string
+          metadata?: Json | null
+          status?: string
+          to_address?: string
+          token?: string
+          tx_hash?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_flags: {
         Row: {
           content_id: string
@@ -600,9 +657,11 @@ export type Database = {
           age: number
           basename: string | null
           bio: string | null
+          connected_wallets: Json | null
           cover_image: string | null
           created_at: string | null
           display_name: string
+          evm_address: string | null
           id: string
           is_online: boolean | null
           last_activity_at: string | null
@@ -611,6 +670,7 @@ export type Database = {
           price: number | null
           profile_image: string | null
           rating: number | null
+          solana_address: string | null
           updated_at: string | null
           wallet_address: string | null
         }
@@ -618,9 +678,11 @@ export type Database = {
           age: number
           basename?: string | null
           bio?: string | null
+          connected_wallets?: Json | null
           cover_image?: string | null
           created_at?: string | null
           display_name: string
+          evm_address?: string | null
           id: string
           is_online?: boolean | null
           last_activity_at?: string | null
@@ -629,6 +691,7 @@ export type Database = {
           price?: number | null
           profile_image?: string | null
           rating?: number | null
+          solana_address?: string | null
           updated_at?: string | null
           wallet_address?: string | null
         }
@@ -636,9 +699,11 @@ export type Database = {
           age?: number
           basename?: string | null
           bio?: string | null
+          connected_wallets?: Json | null
           cover_image?: string | null
           created_at?: string | null
           display_name?: string
+          evm_address?: string | null
           id?: string
           is_online?: boolean | null
           last_activity_at?: string | null
@@ -647,6 +712,7 @@ export type Database = {
           price?: number | null
           profile_image?: string | null
           rating?: number | null
+          solana_address?: string | null
           updated_at?: string | null
           wallet_address?: string | null
         }
@@ -1047,6 +1113,15 @@ export type Database = {
           p_amount: number
           p_description?: string
           p_reference: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      credit_wallet_from_chain: {
+        Args: {
+          p_amount: number
+          p_chain: string
+          p_tx_hash: string
           p_user_id: string
         }
         Returns: Json
