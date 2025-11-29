@@ -165,18 +165,18 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
           
           if (!isRelevant) return;
           
-          // Check for duplicates - only check by real ID, optimistic replacement happens in handleSendMessage
+          // CRITICAL FIX: Only add messages from OTHER users via realtime
+          // Messages sent by current user are handled optimistically in handleSendMessage
+          if (newMsg.sender_id === currentProfileId) {
+            return; // Skip - already added optimistically
+          }
+          
+          // Add new message from other user
           setMessages((prev) => {
+            // Double-check for duplicates
             const existsById = prev.some(m => m.id === String(newMsg.id));
             if (existsById) return prev;
             
-            // If this message was sent by current user, it's already added optimistically
-            // Don't add it again from realtime
-            if (newMsg.sender_id === currentProfileId) {
-              return prev;
-            }
-            
-            // Add new message from other user
             const newMessageObj: Message = {
               id: String(newMsg.id),
               text: newMsg.text ?? "",

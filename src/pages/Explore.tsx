@@ -63,14 +63,27 @@ const Explore = () => {
         .eq("role", "admin");
       
       const adminIds = (adminRoles || []).map((r: any) => r.user_id);
-      const excludeIds = [...adminIds, user?.id || ""].filter(Boolean);
       
-      const { data, error } = await (supabase as any)
+      // Build query
+      let query = (supabase as any)
         .from("profiles")
-        .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at")
-        .not("id", "in", `(${excludeIds.join(',')})`) // Exclude current user and admins
+        .select("id, display_name, age, location, profile_image, price, rating, is_online, created_at");
+      
+      // Exclude current user if logged in
+      if (user?.id) {
+        query = query.neq("id", user.id);
+      }
+      
+      // Exclude admin users
+      if (adminIds.length > 0) {
+        query = query.not("id", "in", `(${adminIds.join(',')})`);
+      }
+      
+      query = query
         .order("rating", { ascending: false })
         .order("created_at", { ascending: true });
+      
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as ProfileData[];
     }
