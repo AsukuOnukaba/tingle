@@ -10,6 +10,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User } from "lucide-react";
 import { moderateText } from "@/lib/contentModeration";
 import { useChatRateLimiter } from "@/hooks/useChatRateLimiter";
+import { ReactionPicker } from "./ReactionPicker";
+
+interface Reaction {
+  emoji: string;
+  count: number;
+  userIds: string[];
+}
 
 interface Message {
   id: string;
@@ -18,6 +25,7 @@ interface Message {
   timestamp: Date;
   type?: "text" | "tip";
   delivery_status?: "sent" | "delivered" | "read";
+  reactions?: Reaction[];
 }
 
 interface Profile {
@@ -40,6 +48,7 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -93,6 +102,44 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
     };
   }, [recipientId]);
 
+  // Fetch reactions for messages
+  const fetchReactions = async (messageIds: string[]) => {
+    if (messageIds.length === 0) return;
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from("message_reactions")
+        .select("*")
+        .in("message_id", messageIds);
+
+      if (error) throw error;
+
+      // Group reactions by message and emoji
+      const grouped: Record<string, Reaction[]> = {};
+      
+      (data || []).forEach((reaction: any) => {
+        const msgId = reaction.message_id;
+        if (!grouped[msgId]) grouped[msgId] = [];
+        
+        const existing = grouped[msgId].find(r => r.emoji === reaction.emoji);
+        if (existing) {
+          existing.count++;
+          existing.userIds.push(reaction.user_id);
+        } else {
+          grouped[msgId].push({
+            emoji: reaction.emoji,
+            count: 1,
+            userIds: [reaction.user_id]
+          });
+        }
+      });
+
+      setReactions(grouped);
+    } catch (err) {
+      console.error("Error fetching reactions:", err);
+    }
+  };
+
   // Fetch messages
   useEffect(() => {
     if (!recipientId || !currentProfileId) return;
@@ -108,14 +155,23 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
         if (error) throw error;
 
         if (data) {
-          setMessages(data.map((m: any) => ({
+          const messageList = data.map((m: any) => ({
             id: String(m.id),
             text: m.text || "",
             sender_id: m.sender_id,
             timestamp: new Date(m.created_at || Date.now()),
             type: m.type as "text" | "tip",
             delivery_status: m.delivery_status as "sent" | "delivered" | "read"
-          })));
+          }));
+          
+          setMessages(messageList);
+          
+          // Fetch reactions for these messages
+          const messageIds = messageList.map(m => m.id);
+          if (messageIds.length > 0) {
+            fetchReactions(messageIds);
+          }
+          
           scrollToBottom();
 
           // Mark messages as read
@@ -255,6 +311,34 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
       supabase.removeChannel(typingChannel);
     };
   }, [recipientId, currentProfileId]);
+
+  // Subscribe to reaction updates
+  useEffect(() => {
+    if (!recipientId || !currentProfileId) return;
+
+    const reactionsChannel = supabase
+      .channel("message_reactions_updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "message_reactions"
+        },
+        async () => {
+          // Refetch reactions when any change occurs
+          const messageIds = messages.map(m => m.id);
+          if (messageIds.length > 0) {
+            await fetchReactions(messageIds);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reactionsChannel);
+    };
+  }, [messages, recipientId, currentProfileId]);
 
   const updateTypingStatus = async (isTyping: boolean) => {
     if (!currentProfileId || !recipientId) return;
@@ -513,6 +597,44 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const handleAddReaction = async (messageId: string, emoji: string) => {
+    if (!currentProfileId) return;
+
+    try {
+      // Check if user already reacted with this emoji
+      const messageReactions = reactions[messageId] || [];
+      const existing = messageReactions.find(r => 
+        r.emoji === emoji && r.userIds.includes(currentProfileId)
+      );
+
+      if (existing) {
+        // Remove reaction
+        await (supabase as any)
+          .from("message_reactions")
+          .delete()
+          .eq("message_id", messageId)
+          .eq("user_id", currentProfileId)
+          .eq("emoji", emoji);
+      } else {
+        // Add reaction
+        await (supabase as any)
+          .from("message_reactions")
+          .insert({
+            message_id: messageId,
+            user_id: currentProfileId,
+            emoji
+          });
+      }
+    } catch (err) {
+      console.error("Error toggling reaction:", err);
+      toast({
+        variant: "destructive",
+        title: "Failed to add reaction",
+        description: "Please try again"
+      });
+    }
+  };
+
   const getDeliveryIcon = (status?: string, isSent?: boolean) => {
     if (!isSent) return null;
     
@@ -569,20 +691,50 @@ const ChatWindow = ({ recipientId, onBack }: ChatWindowProps) => {
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.map((message) => {
             const isSent = message.sender_id === currentProfileId;
+            const messageReactions = reactions[message.id] || [];
+            
             return (
-              <div key={message.id} className={`flex ${isSent ? "justify-end" : "justify-start"} animate-fade-up`}>
-                <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
-                  isSent 
-                    ? message.type === "tip" 
-                      ? "gradient-secondary text-white" 
-                      : "gradient-primary text-white" 
-                    : "glass-card text-foreground"
-                } ${message.type === "tip" ? "neon-glow" : ""}`}>
-                  <p className="text-sm leading-relaxed">{message.text}</p>
-                  <div className={`flex items-center gap-1 mt-2 text-xs ${isSent ? "text-white/70" : "text-muted-foreground"}`}>
-                    <span>{formatTime(message.timestamp)}</span>
-                    {getDeliveryIcon(message.delivery_status, isSent)}
+              <div key={message.id} className={`flex ${isSent ? "justify-end" : "justify-start"} animate-fade-up group`}>
+                <div className="flex flex-col">
+                  <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                    isSent 
+                      ? message.type === "tip" 
+                        ? "gradient-secondary text-white" 
+                        : "gradient-primary text-white" 
+                      : "glass-card text-foreground"
+                  } ${message.type === "tip" ? "neon-glow" : ""}`}>
+                    <p className="text-sm leading-relaxed">{message.text}</p>
+                    <div className={`flex items-center justify-between gap-2 mt-2`}>
+                      <div className={`flex items-center gap-1 text-xs ${isSent ? "text-white/70" : "text-muted-foreground"}`}>
+                        <span>{formatTime(message.timestamp)}</span>
+                        {getDeliveryIcon(message.delivery_status, isSent)}
+                      </div>
+                      <ReactionPicker onSelect={(emoji) => handleAddReaction(message.id, emoji)} />
+                    </div>
                   </div>
+                  
+                  {/* Display reactions */}
+                  {messageReactions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1 px-1">
+                      {messageReactions.map((reaction, idx) => {
+                        const userReacted = reaction.userIds.includes(currentProfileId || "");
+                        return (
+                          <button
+                            key={`${reaction.emoji}-${idx}`}
+                            onClick={() => handleAddReaction(message.id, reaction.emoji)}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all ${
+                              userReacted
+                                ? "bg-primary/20 border border-primary"
+                                : "bg-muted/50 border border-border/50 hover:bg-muted"
+                            }`}
+                          >
+                            <span>{reaction.emoji}</span>
+                            <span className="text-xs">{reaction.count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
