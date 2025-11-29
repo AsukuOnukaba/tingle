@@ -166,14 +166,29 @@ const Chat = () => {
           
           if (!isRelevant) return;
           
-          const newMessageObj: Message = {
-            id: String(newMsg.id),
-            text: newMsg.text ?? "",
-            sender: newMsg.sender_id === currentProfileId ? "user" : "creator",
-            timestamp: new Date(newMsg.created_at || Date.now()),
-            type: (newMsg.type as "text" | "tip" | "unlock") ?? "text",
-          };
-          setMessages((prev) => [...prev, newMessageObj]);
+          // CRITICAL FIX: Only add messages from OTHER users via realtime
+          // Messages sent by current user are handled optimistically in handleSendMessage
+          if (newMsg.sender_id === currentProfileId) {
+            return; // Skip - already added optimistically
+          }
+          
+          // Add new message from other user
+          setMessages((prev) => {
+            // Check for duplicates
+            const existsById = prev.some(m => m.id === String(newMsg.id));
+            if (existsById) return prev;
+            
+            const newMessageObj: Message = {
+              id: String(newMsg.id),
+              text: newMsg.text ?? "",
+              sender: "creator",
+              timestamp: new Date(newMsg.created_at || Date.now()),
+              type: (newMsg.type as "text" | "tip" | "unlock") ?? "text",
+            };
+            
+            return [...prev, newMessageObj];
+          });
+          
           scrollToBottom();
         }
       )
@@ -198,15 +213,19 @@ const Chat = () => {
       is_read: false,
     };
 
+    // Generate unique client ID for optimistic message
+    const clientId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Optimistic update
     const tempMessage: Message = {
-      id: Date.now().toString(),
+      id: clientId,
       text: newMessage,
       sender: "user",
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, tempMessage]);
     setNewMessage("");
+    scrollToBottom();
 
     try {
       const { data: insertData, error: insertError } = await supabase
@@ -217,12 +236,13 @@ const Chat = () => {
 
       if (insertError) {
         console.error("Error sending message:", insertError);
-        setMessages((prev) => prev.filter((m) => m.id !== tempMessage.id));
+        setMessages((prev) => prev.filter((m) => m.id !== clientId));
       } else if (insertData) {
         const insertedData = insertData as DBMessage;
+        // Replace optimistic message with real one
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === tempMessage.id
+            m.id === clientId
               ? {
                 ...m,
                 id: insertedData.id.toString(),
@@ -235,7 +255,7 @@ const Chat = () => {
     }
     catch (err) {
       console.error("Send message failed:", err);
-      setMessages((prev) => prev.filter((m) => m.id !== tempMessage.id));
+      setMessages((prev) => prev.filter((m) => m.id !== clientId));
     }
   };
 

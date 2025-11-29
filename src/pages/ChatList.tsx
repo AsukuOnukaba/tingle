@@ -30,6 +30,54 @@ const ChatList = () => {
   useEffect(() => {
     if (user) {
       fetchConversations();
+      
+      // Subscribe to new messages for real-time conversation updates
+      const messagesChannel = supabase
+        .channel('chat_list_updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `recipient_id=eq.${user.id}`
+          },
+          () => {
+            // Refetch conversations when new message arrives
+            fetchConversations();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${user.id}`
+          },
+          () => {
+            // Refetch conversations when user sends new message
+            fetchConversations();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `recipient_id=eq.${user.id}`
+          },
+          () => {
+            // Update when message read status changes
+            fetchConversations();
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        supabase.removeChannel(messagesChannel);
+      };
     }
   }, [user]);
 
