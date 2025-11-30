@@ -14,6 +14,8 @@ declare global {
       on?: (event: string, callback: (...args: unknown[]) => void) => void;
       removeListener?: (event: string, callback: (...args: unknown[]) => void) => void;
     };
+    okxwallet?: any;
+    phantom?: any;
   }
 }
 
