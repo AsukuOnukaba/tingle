@@ -44,46 +44,47 @@ const PremiumGallery = () => {
     if (!id || !user) return;
     
     try {
-      // Check premium content access using entitlements
-      const { data: hasAccess, error: accessError } = await sb
-        .rpc('check_premium_chat_access', {
-          p_user_id: user.id,
-          p_creator_id: id
-        });
+      // Check if user has active subscription entitlement for premium content
+      const { data: entitlements, error: entError } = await sb
+        .from("subscription_entitlements")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("creator_id", id)
+        .eq("entitlement_type", "premium_content")
+        .eq("is_active", true)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
 
-      if (accessError) {
-        console.error('Access check error:', accessError);
-        // Fall back to checking subscriptions directly
-        const { data: creatorData } = await sb
-          .from("creators")
-          .select("id")
-          .eq("user_id", id)
-          .maybeSingle();
+      if (entError) {
+        console.error('Entitlement check error:', entError);
+      }
 
-        if (!creatorData) {
-          setHasSubscription(false);
-          return;
-        }
+      if (entitlements) {
+        setHasSubscription(true);
+        return;
+      }
 
-        const { data, error } = await sb
-          .from("subscriptions")
-          .select("*")
-          .eq("subscriber_id", user.id)
-          .eq("creator_id", creatorData.id)
-          .eq("is_active", true)
-          .maybeSingle();
+      // If no entitlements, check subscriptions directly (fallback)
+      const { data: subscription, error: subError } = await sb
+        .from("subscriptions")
+        .select("*, expires_at")
+        .eq("subscriber_id", user.id)
+        .eq("creator_id", id)
+        .eq("is_active", true)
+        .maybeSingle();
 
-        if (error) throw error;
-        
-        if (data) {
-          const expiryDate = new Date(data.expires_at);
-          const now = new Date();
-          setHasSubscription(expiryDate > now);
-        } else {
-          setHasSubscription(false);
-        }
+      if (subError) {
+        console.error('Subscription check error:', subError);
+        setHasSubscription(false);
+        return;
+      }
+
+      if (subscription) {
+        const expiryDate = new Date(subscription.expires_at);
+        const now = new Date();
+        setHasSubscription(expiryDate > now);
       } else {
-        setHasSubscription(hasAccess || false);
+        setHasSubscription(false);
       }
     } catch (error) {
       console.error("Error checking subscription status:", error);

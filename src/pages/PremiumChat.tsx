@@ -46,41 +46,45 @@ const PremiumChat = () => {
       if (profileError) throw profileError;
       setCreatorProfile(profileData);
 
-      // Check premium chat access using the new entitlements system
-      const { data: hasAccess, error: accessError } = await sb
-        .rpc('check_premium_chat_access', {
-          p_user_id: user.id,
-          p_creator_id: id
-        });
+      // Check if user has active subscription entitlement for premium chat
+      const { data: entitlements, error: entError } = await sb
+        .from("subscription_entitlements")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("creator_id", id)
+        .eq("entitlement_type", "premium_chat")
+        .eq("is_active", true)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
 
-      if (accessError) {
-        console.error('Access check error:', accessError);
-        // Fall back to checking subscriptions directly
-        const { data: subData, error: subError } = await sb
-          .from("subscriptions")
-          .select("*, expires_at")
-          .eq("subscriber_id", user.id)
-          .eq("creator_id", id)
-          .eq("is_active", true)
-          .maybeSingle();
-
-        if (subError) throw subError;
-
-        if (!subData || new Date(subData.expires_at) < new Date()) {
-          toast.error("Premium chat requires an active subscription");
-          navigate(`/profile/${id}`);
-          return;
-        }
-
-        setHasSubscription(true);
-      } else if (!hasAccess) {
-        toast.error("Premium chat requires an active subscription with chat access");
-        navigate(`/profile/${id}`);
-        return;
-      } else {
-        setHasSubscription(true);
+      if (entError) {
+        console.error('Entitlement check error:', entError);
       }
 
+      if (entitlements) {
+        setHasSubscription(true);
+        setLoading(false);
+        return;
+      }
+
+      // If no entitlements, check subscriptions directly (fallback)
+      const { data: subscription, error: subError } = await sb
+        .from("subscriptions")
+        .select("*, expires_at")
+        .eq("subscriber_id", user.id)
+        .eq("creator_id", id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (subError) throw subError;
+
+      if (!subscription || new Date(subscription.expires_at) < new Date()) {
+        toast.error("Premium chat requires an active subscription");
+        navigate(`/profile/${id}`);
+        return;
+      }
+
+      setHasSubscription(true);
       setLoading(false);
     } catch (error: any) {
       console.error("Error checking access:", error);

@@ -30,6 +30,7 @@ interface Transaction {
   status: string;
   description: string;
   blockchain_hash: string | null;
+  chain: string | null;
   created_at: string;
 }
 
@@ -78,15 +79,41 @@ const Wallet = () => {
 
   const fetchTransactions = async () => {
     try {
-      const { data, error } = await sb
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false })
-        .limit(20);
+      // Fetch both fiat and blockchain transactions
+      const [fiatTxns, blockchainTxns] = await Promise.all([
+        sb.from("transactions")
+          .select("*")
+          .eq("user_id", user?.id)
+          .order("created_at", { ascending: false })
+          .limit(20),
+        sb.from("blockchain_transactions")
+          .select("*")
+          .eq("user_id", user?.id)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      ]);
 
-      if (error) throw error;
-      setTransactions(data || []);
+      // Merge and sort by date
+      const allTransactions = [
+        ...(fiatTxns.data || []).map(tx => ({
+          ...tx,
+          blockchain_hash: null,
+          chain: null,
+        })),
+        ...(blockchainTxns.data || []).map(tx => ({
+          id: tx.id,
+          amount: tx.amount,
+          type: tx.direction === 'deposit' ? 'credit' : 'debit',
+          reference: tx.tx_hash,
+          status: tx.status,
+          description: `${tx.chain.toUpperCase()} ${tx.direction}`,
+          blockchain_hash: tx.tx_hash,
+          chain: tx.chain,
+          created_at: tx.created_at,
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setTransactions(allTransactions);
     } catch (error) {
       console.error("Error fetching transactions:", error);
     }
@@ -162,16 +189,17 @@ const Wallet = () => {
                       ₦{wallet?.balance.toFixed(2) || "0.00"}
                     </p>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Button onClick={() => setTopUpOpen(true)} className="flex-1">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button onClick={() => setTopUpOpen(true)} className="w-full" size="lg">
                       <Plus className="w-4 h-4 mr-2" />
                       Top Up
                     </Button>
                     {isCreator && (
                       <Button 
                         onClick={() => setWithdrawOpen(true)} 
-                        variant="outline"
-                        className="flex-1"
+                        variant="default"
+                        className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
+                        size="lg"
                       >
                         <Minus className="w-4 h-4 mr-2" />
                         Withdraw
@@ -182,23 +210,38 @@ const Wallet = () => {
               </CardContent>
             </Card>
 
-            {/* MetaMask Connection (Creators Only) */}
-            {isCreator && (
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle>Blockchain Wallet</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <WalletConnect 
-                    currentWalletAddress={creatorWalletAddress || undefined}
-                    onConnect={(address) => setCreatorWalletAddress(address)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Connect your crypto wallet for blockchain transaction transparency
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Multi-Chain Wallet Addresses */}
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle>Wallet Addresses</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {isCreator && creatorWalletAddress ? (
+                  <>
+                    <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                      <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
+                      <p className="text-xs font-mono break-all">{creatorWalletAddress}</p>
+                    </div>
+                    <WalletConnect 
+                      currentWalletAddress={creatorWalletAddress || undefined}
+                      onConnect={(address) => setCreatorWalletAddress(address)}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {isCreator ? "Connect your blockchain wallet" : "View your wallet addresses"}
+                    </p>
+                    {isCreator && (
+                      <WalletConnect 
+                        currentWalletAddress={creatorWalletAddress || undefined}
+                        onConnect={(address) => setCreatorWalletAddress(address)}
+                      />
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Payment Methods */}
@@ -323,15 +366,26 @@ const Wallet = () => {
                               {transaction.status}
                             </Badge>
                           </div>
-                          {transaction.blockchain_hash && (
-                            <a
-                              href={`https://mumbai.polygonscan.com/tx/${transaction.blockchain_hash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline mt-1 block"
-                            >
-                              View on Blockchain ↗
-                            </a>
+                          {transaction.blockchain_hash && transaction.chain && (
+                            <>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Chain: <span className="font-semibold text-foreground">{transaction.chain.toUpperCase()}</span>
+                              </p>
+                              <a
+                                href={
+                                  transaction.chain === 'ethereum' ? `https://etherscan.io/tx/${transaction.blockchain_hash}` :
+                                  transaction.chain === 'base' ? `https://basescan.org/tx/${transaction.blockchain_hash}` :
+                                  transaction.chain === 'polygon' ? `https://polygonscan.com/tx/${transaction.blockchain_hash}` :
+                                  transaction.chain === 'solana' ? `https://solscan.io/tx/${transaction.blockchain_hash}` :
+                                  `https://mumbai.polygonscan.com/tx/${transaction.blockchain_hash}`
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline mt-1 block"
+                              >
+                                View on {transaction.chain.charAt(0).toUpperCase() + transaction.chain.slice(1)} Explorer ↗
+                              </a>
+                            </>
                           )}
                         </div>
                       </div>

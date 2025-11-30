@@ -44,14 +44,35 @@ export const MultiWalletConnect = ({ onConnect }: MultiWalletConnectProps) => {
     try {
       let connection: WalletConnection;
 
+      // Check if on mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
       switch (provider) {
         case 'metamask':
+          if (isMobile && !window.ethereum) {
+            // Trigger MetaMask mobile app
+            const deepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+            window.location.href = deepLink;
+            throw new Error('Opening MetaMask app...');
+          }
           connection = await connectMetaMask(selectedChain);
           break;
         case 'okx':
+          if (isMobile && !window.okxwallet) {
+            // Trigger OKX mobile app
+            const deepLink = `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(window.location.href)}`;
+            window.location.href = deepLink;
+            throw new Error('Opening OKX Wallet app...');
+          }
           connection = await connectOKX(selectedChain);
           break;
         case 'phantom':
+          if (isMobile && !(window as any).phantom?.solana) {
+            // Trigger Phantom mobile app
+            const deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=${window.location.host}`;
+            window.location.href = deepLink;
+            throw new Error('Opening Phantom app...');
+          }
           connection = await connectPhantom();
           break;
         case 'walletconnect':
@@ -226,9 +247,13 @@ export const MultiWalletConnect = ({ onConnect }: MultiWalletConnectProps) => {
         {/* Mobile Instructions */}
         {/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && (
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <p className="text-xs text-muted-foreground">
-              <strong>Mobile:</strong> If wallet doesn't open, try using the in-app browser of your wallet app (MetaMask, OKX, or Phantom).
+            <p className="text-xs">
+              <strong className="text-primary">Mobile Users:</strong>
             </p>
+            <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+              <li>If your wallet doesn't open automatically, use your wallet app's in-app browser</li>
+              <li>Copy this URL and paste it in your wallet's browser: <span className="font-mono">{window.location.href}</span></li>
+            </ul>
           </div>
         )}
 
