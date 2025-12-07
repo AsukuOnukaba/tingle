@@ -1,19 +1,30 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Navigation from "@/components/Navigation";
 import { TopUpModal } from "@/components/TopUpModal";
 import { WithdrawModal } from "@/components/WithdrawModal";
-import { WalletConnect } from "@/components/WalletConnect";
+import { WalletAddressManager } from "@/components/wallet/WalletAddressManager";
 import { EscrowManager } from "@/components/EscrowManager";
 import { useAuth } from "@/hooks/useAuth";
 import { useRoles } from "@/hooks/useRoles";
 import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
-import { Wallet as WalletIcon, Plus, Minus, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { 
+  Wallet as WalletIcon, 
+  Plus, 
+  Minus, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  CreditCard,
+  Coins,
+  TrendingUp,
+  History
+} from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const sb = supabase as unknown as SupabaseClient<any>;
 
@@ -79,21 +90,19 @@ const Wallet = () => {
 
   const fetchTransactions = async () => {
     try {
-      // Fetch both fiat and blockchain transactions
       const [fiatTxns, blockchainTxns] = await Promise.all([
         sb.from("transactions")
           .select("*")
           .eq("user_id", user?.id)
           .order("created_at", { ascending: false })
-          .limit(20),
+          .limit(50),
         sb.from("blockchain_transactions")
           .select("*")
           .eq("user_id", user?.id)
           .order("created_at", { ascending: false })
-          .limit(20)
+          .limit(50)
       ]);
 
-      // Merge and sort by date
       const allTransactions = [
         ...(fiatTxns.data || []).map(tx => ({
           ...tx,
@@ -144,6 +153,17 @@ const Wallet = () => {
     fetchTransactions();
   };
 
+  const getExplorerUrl = (chain: string, hash: string) => {
+    const explorers: Record<string, string> = {
+      ethereum: 'https://etherscan.io/tx/',
+      base: 'https://basescan.org/tx/',
+      polygon: 'https://polygonscan.com/tx/',
+      bnb: 'https://bscscan.com/tx/',
+      solana: 'https://solscan.io/tx/',
+    };
+    return `${explorers[chain] || 'https://etherscan.io/tx/'}${hash}`;
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -164,44 +184,56 @@ const Wallet = () => {
       <Navigation />
       
       <div className="pt-20 pb-8">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">My Wallet</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Manage your balance and transactions
+            <h1 className="text-3xl md:text-4xl font-bold mb-2 flex items-center gap-3">
+              <WalletIcon className="w-8 h-8 text-primary" />
+              My Wallet
+            </h1>
+            <p className="text-muted-foreground">
+              Manage your balance, deposits, and blockchain addresses
             </p>
           </div>
 
+          {/* Balance Overview */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Wallet Balance Card */}
-            <Card className="glass-card lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <WalletIcon className="w-5 h-5" />
-                  <span>Wallet Balance</span>
+            {/* Main Balance Card */}
+            <Card className="lg:col-span-2 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent" />
+              <CardHeader className="relative">
+                <CardTitle className="flex items-center gap-2">
+                  <Coins className="w-5 h-5" />
+                  Wallet Balance
                 </CardTitle>
+                <CardDescription>Your available funds in Nigerian Naira</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="relative">
+                <div className="space-y-6">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-                    <p className="text-3xl md:text-4xl font-bold">
-                      ₦{wallet?.balance.toFixed(2) || "0.00"}
+                    <p className="text-4xl md:text-5xl font-bold tracking-tight">
+                      ₦{wallet?.balance?.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"}
                     </p>
                   </div>
+                  
                   <div className="grid grid-cols-2 gap-3">
-                    <Button onClick={() => setTopUpOpen(true)} className="w-full" size="lg">
-                      <Plus className="w-4 h-4 mr-2" />
+                    <Button 
+                      onClick={() => setTopUpOpen(true)} 
+                      size="lg"
+                      className="w-full h-14 text-lg"
+                    >
+                      <Plus className="w-5 h-5 mr-2" />
                       Top Up
                     </Button>
                     {isCreator && (
                       <Button 
                         onClick={() => setWithdrawOpen(true)} 
                         variant="default"
-                        className="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
+                        className="w-full h-14 text-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
                         size="lg"
                       >
-                        <Minus className="w-4 h-4 mr-2" />
+                        <Minus className="w-5 h-5 mr-2" />
                         Withdraw
                       </Button>
                     )}
@@ -210,197 +242,193 @@ const Wallet = () => {
               </CardContent>
             </Card>
 
-            {/* Multi-Chain Wallet Addresses */}
+            {/* Quick Stats */}
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Wallet Addresses</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Quick Stats
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {isCreator && creatorWalletAddress ? (
-                  <>
-                    <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                      <p className="text-xs text-muted-foreground mb-1">Connected Wallet</p>
-                      <p className="text-xs font-mono break-all">{creatorWalletAddress}</p>
-                    </div>
-                    <WalletConnect 
-                      currentWalletAddress={creatorWalletAddress || undefined}
-                      onConnect={(address) => setCreatorWalletAddress(address)}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {isCreator ? "Connect your blockchain wallet" : "View your wallet addresses"}
-                    </p>
-                    {isCreator && (
-                      <WalletConnect 
-                        currentWalletAddress={creatorWalletAddress || undefined}
-                        onConnect={(address) => setCreatorWalletAddress(address)}
-                      />
-                    )}
-                  </>
-                )}
+              <CardContent className="space-y-4">
+                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <p className="text-xs text-muted-foreground mb-1">Total Deposits</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    ₦{transactions
+                      .filter(t => t.type === 'credit')
+                      .reduce((sum, t) => sum + t.amount, 0)
+                      .toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <p className="text-xs text-muted-foreground mb-1">Total Spent</p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    ₦{transactions
+                      .filter(t => t.type === 'debit')
+                      .reduce((sum, t) => sum + t.amount, 0)
+                      .toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="text-xs text-muted-foreground text-center">
+                  {transactions.length} total transactions
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Payment Methods */}
-          <Card className="glass-card mb-8">
-            <CardHeader>
-              <CardTitle>Payment Methods</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Card Payment */}
-                <div className="p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Plus className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Card Payment</h3>
-                      <p className="text-xs text-muted-foreground">Paystack - Instant</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => setTopUpOpen(true)} className="w-full" size="sm">
-                    Top Up with Card
-                  </Button>
-                </div>
+          {/* Tabs Section */}
+          <Tabs defaultValue="addresses" className="space-y-6">
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
+              <TabsTrigger value="addresses">Addresses</TabsTrigger>
+              <TabsTrigger value="deposit">Deposit</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+            </TabsList>
 
-                {/* Bitcoin */}
-                <div className="p-4 rounded-lg border border-border bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold">
-                      ₿
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Bitcoin (BTC)</h3>
-                      <p className="text-xs text-muted-foreground">Coming Soon</p>
-                    </div>
-                  </div>
-                  <Button disabled className="w-full" size="sm" variant="outline">
-                    Coming Soon
-                  </Button>
-                </div>
+            {/* Blockchain Addresses Tab */}
+            <TabsContent value="addresses" className="space-y-6">
+              <WalletAddressManager />
+              
+              {/* Escrow for creators */}
+              {isCreator && creatorWalletAddress && (
+                <EscrowManager creatorAddress={creatorWalletAddress} />
+              )}
+            </TabsContent>
 
-                {/* Ethereum */}
-                <div className="p-4 rounded-lg border border-border bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                      Ξ
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Ethereum (ETH)</h3>
-                      <p className="text-xs text-muted-foreground">Coming Soon</p>
-                    </div>
-                  </div>
-                  <Button disabled className="w-full" size="sm" variant="outline">
-                    Coming Soon
-                  </Button>
-                </div>
-
-                {/* USDT */}
-                <div className="p-4 rounded-lg border border-border bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold">
-                      ₮
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">Tether (USDT)</h3>
-                      <p className="text-xs text-muted-foreground">Coming Soon</p>
-                    </div>
-                  </div>
-                  <Button disabled className="w-full" size="sm" variant="outline">
-                    Coming Soon
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Blockchain Earnings & Escrow */}
-          {isCreator && creatorWalletAddress && (
-            <div className="mb-8">
-              <EscrowManager creatorAddress={creatorWalletAddress} />
-            </div>
-          )}
-
-          {/* Transactions */}
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Transaction History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {transactions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No transactions yet
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {transactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className={`p-2 rounded-full ${
-                          transaction.type === 'credit' 
-                            ? 'bg-green-500/10 text-green-500' 
-                            : 'bg-red-500/10 text-red-500'
-                        }`}>
-                          {transaction.type === 'credit' ? (
-                            <ArrowDownRight className="w-4 h-4" />
-                          ) : (
-                            <ArrowUpRight className="w-4 h-4" />
-                          )}
+            {/* Deposit Methods Tab */}
+            <TabsContent value="deposit" className="space-y-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Payment Methods
+                  </CardTitle>
+                  <CardDescription>Choose how you want to add funds to your wallet</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Card Payment */}
+                    <div className="p-5 rounded-xl border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer" onClick={() => setTopUpOpen(true)}>
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+                          <CreditCard className="w-6 h-6 text-primary-foreground" />
                         </div>
                         <div>
-                          <p className="font-medium">
-                            {transaction.description || transaction.type}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(transaction.created_at).toLocaleDateString()}
-                            </p>
-                            <Badge variant="outline" className="text-xs">
-                              {transaction.status}
-                            </Badge>
-                          </div>
-                          {transaction.blockchain_hash && transaction.chain && (
-                            <>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Chain: <span className="font-semibold text-foreground">{transaction.chain.toUpperCase()}</span>
-                              </p>
-                              <a
-                                href={
-                                  transaction.chain === 'ethereum' ? `https://etherscan.io/tx/${transaction.blockchain_hash}` :
-                                  transaction.chain === 'base' ? `https://basescan.org/tx/${transaction.blockchain_hash}` :
-                                  transaction.chain === 'polygon' ? `https://polygonscan.com/tx/${transaction.blockchain_hash}` :
-                                  transaction.chain === 'solana' ? `https://solscan.io/tx/${transaction.blockchain_hash}` :
-                                  `https://mumbai.polygonscan.com/tx/${transaction.blockchain_hash}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline mt-1 block"
-                              >
-                                View on {transaction.chain.charAt(0).toUpperCase() + transaction.chain.slice(1)} Explorer ↗
-                              </a>
-                            </>
-                          )}
+                          <h3 className="font-semibold text-lg">Card Payment</h3>
+                          <p className="text-sm text-muted-foreground">Paystack • Instant</p>
                         </div>
                       </div>
-                       <p className={`text-lg font-bold ${
-                        transaction.type === 'credit' ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                         {transaction.type === 'credit' ? '+' : '-'}
-                         ₦{transaction.amount.toFixed(2)}
-                       </p>
+                      <Button className="w-full" size="lg">
+                        Top Up with Card
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
+                    {/* Crypto - Coming Soon */}
+                    <div className="p-5 rounded-xl border border-border bg-muted/30">
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-xl">
+                          ₿
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Crypto Deposit</h3>
+                          <p className="text-sm text-muted-foreground">BTC, ETH, SOL • Coming Soon</p>
+                        </div>
+                      </div>
+                      <Button disabled className="w-full" size="lg" variant="outline">
+                        Coming Soon
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Transaction History Tab */}
+            <TabsContent value="history">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="w-5 h-5" />
+                    Transaction History
+                  </CardTitle>
+                  <CardDescription>All your deposits, withdrawals, and transfers</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {transactions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <History className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">No transactions yet</p>
+                      <Button onClick={() => setTopUpOpen(true)} className="mt-4">
+                        Make your first deposit
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {transactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-full ${
+                              transaction.type === 'credit' 
+                                ? 'bg-green-500/10 text-green-500' 
+                                : 'bg-red-500/10 text-red-500'
+                            }`}>
+                              {transaction.type === 'credit' ? (
+                                <ArrowDownRight className="w-5 h-5" />
+                              ) : (
+                                <ArrowUpRight className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium">
+                                {transaction.description || (transaction.type === 'credit' ? 'Deposit' : 'Withdrawal')}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(transaction.created_at).toLocaleDateString('en-NG', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </p>
+                                <Badge variant={transaction.status === 'completed' ? 'default' : 'outline'} className="text-xs">
+                                  {transaction.status}
+                                </Badge>
+                                {transaction.chain && (
+                                  <Badge variant="secondary" className="text-xs uppercase">
+                                    {transaction.chain}
+                                  </Badge>
+                                )}
+                              </div>
+                              {transaction.blockchain_hash && transaction.chain && (
+                                <a
+                                  href={getExplorerUrl(transaction.chain, transaction.blockchain_hash)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
+                                >
+                                  View on Explorer ↗
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <p className={`text-xl font-bold ${
+                            transaction.type === 'credit' ? 'text-green-500' : 'text-red-500'
+                          }`}>
+                            {transaction.type === 'credit' ? '+' : '-'}
+                            ₦{transaction.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 
