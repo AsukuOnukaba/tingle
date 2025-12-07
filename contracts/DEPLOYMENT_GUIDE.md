@@ -57,7 +57,7 @@
 1. **Update Blockchain Configuration:**
    ```typescript
    // In src/lib/blockchain.ts, line 23:
-   const CONTRACT_ADDRESS = "0xYourDeployedContractAddress"; // Replace this
+   const CONTRACT_ADDRESS = ""; // Replace this
    ```
 
 2. **Test the Integration:**

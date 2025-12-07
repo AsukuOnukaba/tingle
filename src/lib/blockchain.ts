@@ -29,7 +29,7 @@ const CONTRACT_ABI = [
 
 // Replace with your deployed contract address
 // Deploy contract to Polygon Mumbai or Ethereum Sepolia testnet
-const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // TODO: Replace after deployment
+const CONTRACT_ADDRESS = "0x063ACB2A71BDE8eC9E4DB5613A7C15196FFec4a1"; // TODO: Replace after deployment
 
 export enum EscrowStatus {
   Pending = 0,
