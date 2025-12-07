@@ -1,7 +1,16 @@
-project_id = "tuomizszdzrdpvvbyvqi"
+project_id = "hixojhwtvqefhatpnflw"
 
 [functions.notify-creator-application]
 verify_jwt = false
 
 [functions.process-subscription]
 verify_jwt = false
+
+[functions.alchemy-webhook]
+verify_jwt = false
+
+[functions.helius-webhook]
+verify_jwt = false
+
+[functions.register-wallet-address]
+verify_jwt = true
