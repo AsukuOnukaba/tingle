@@ -31,7 +31,7 @@ const ChatList = () => {
     if (user) {
       fetchConversations();
       
-      // Subscribe to new messages for real-time conversation updates
+      // Subscribe to ALL message changes for real-time conversation updates
       const messagesChannel = supabase
         .channel('chat_list_updates')
         .on(
@@ -39,25 +39,15 @@ const ChatList = () => {
           {
             event: 'INSERT',
             schema: 'public',
-            table: 'messages',
-            filter: `recipient_id=eq.${user.id}`
+            table: 'messages'
           },
-          () => {
-            // Refetch conversations when new message arrives
-            fetchConversations();
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `sender_id=eq.${user.id}`
-          },
-          () => {
-            // Refetch conversations when user sends new message
-            fetchConversations();
+          (payload) => {
+            const newMsg = payload.new as any;
+            // Check if message involves current user
+            if (newMsg.sender_id === user.id || newMsg.recipient_id === user.id) {
+              // Immediately update conversations list
+              fetchConversations();
+            }
           }
         )
         .on(
@@ -65,12 +55,13 @@ const ChatList = () => {
           {
             event: 'UPDATE',
             schema: 'public',
-            table: 'messages',
-            filter: `recipient_id=eq.${user.id}`
+            table: 'messages'
           },
-          () => {
-            // Update when message read status changes
-            fetchConversations();
+          (payload) => {
+            const updatedMsg = payload.new as any;
+            if (updatedMsg.sender_id === user.id || updatedMsg.recipient_id === user.id) {
+              fetchConversations();
+            }
           }
         )
         .subscribe();

@@ -87,6 +87,13 @@ export function ProfileReviews({ profileId }: ProfileReviewsProps) {
       return;
     }
 
+    // Check if user already submitted a review for this profile
+    const existingReview = reviews.find(r => r.reviewer_id === user.id);
+    if (existingReview) {
+      toast.error("You have already submitted a review for this creator. You can edit or delete your existing review.");
+      return;
+    }
+
     // Moderate comment content
     const moderation = moderateText(comment);
     if (!moderation.isAllowed) {
@@ -108,7 +115,14 @@ export function ProfileReviews({ profileId }: ProfileReviewsProps) {
         comment: comment.trim(),
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for unique constraint violation
+        if (error.code === '23505') {
+          toast.error("You have already submitted a review for this creator.");
+          return;
+        }
+        throw error;
+      }
 
       toast.success("Review submitted successfully!");
       setRating(0);
