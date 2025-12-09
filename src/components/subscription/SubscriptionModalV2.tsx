@@ -36,7 +36,7 @@ export const SubscriptionModalV2 = ({
   const { user } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "card">("wallet");
+  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "card" | "flutterwave">("wallet");
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingPlans, setLoadingPlans] = useState(true);
@@ -216,7 +216,7 @@ export const SubscriptionModalV2 = ({
     }
   };
 
-  const handleCardPayment = async () => {
+  const handleCardPayment = async (gateway: 'paystack' | 'flutterwave' = 'paystack') => {
     if (!user || !selectedPlan) return;
 
     setLoading(true);
@@ -237,52 +237,116 @@ export const SubscriptionModalV2 = ({
           amount: selectedPlan.price,
           reference: reference,
           status: "pending",
+          gateway: gateway,
         });
 
       if (intentError) throw intentError;
 
-      // Initialize Paystack
-      const handler = (window as any).PaystackPop.setup({
-        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-        email: authUser.email,
-        amount: selectedPlan.price * 100, // Convert to kobo
-        currency: "NGN",
-        ref: reference,
-        metadata: {
-          plan_id: selectedPlan.id,
-          creator_id: creatorId,
-          user_id: user.id,
-        },
-        callback: async (response: any) => {
-          toast.success("Payment successful! Processing subscription...");
-          
-          // Process subscription via edge function
-          const { error: processError } = await supabase.functions.invoke(
-            "process-subscription",
-            {
-              body: {
-                reference: response.reference,
-                plan_id: selectedPlan.id,
-                creator_id: creatorId,
-              },
+      if (gateway === 'flutterwave') {
+        // Initialize Flutterwave
+        const flutterwaveConfig = {
+          public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY,
+          tx_ref: reference,
+          amount: selectedPlan.price,
+          currency: "NGN",
+          payment_options: "card,mobilemoney,ussd,banktransfer",
+          customer: {
+            email: authUser.email,
+          },
+          meta: {
+            plan_id: selectedPlan.id,
+            creator_id: creatorId,
+            user_id: user.id,
+          },
+          customizations: {
+            title: "Tingle Subscription",
+            description: `Subscribe to ${selectedPlan.name}`,
+          },
+          callback: async (response: any) => {
+            if (response.status === "successful") {
+              toast.success("Payment successful! Processing subscription...");
+              
+              const { error: processError } = await supabase.functions.invoke(
+                "process-subscription",
+                {
+                  body: {
+                    reference: response.tx_ref,
+                    plan_id: selectedPlan.id,
+                    creator_id: creatorId,
+                  },
+                }
+              );
+
+              if (processError) {
+                toast.error("Failed to activate subscription");
+              } else {
+                toast.success(`Successfully subscribed to ${selectedPlan.name}!`);
+                onSuccess();
+                onClose();
+              }
             }
-          );
+            setLoading(false);
+          },
+          onclose: () => {
+            toast.error("Payment cancelled");
+            setLoading(false);
+          },
+        };
 
-          if (processError) {
-            toast.error("Failed to activate subscription");
-          } else {
-            toast.success(`Successfully subscribed to ${selectedPlan.name}!`);
-            onSuccess();
-            onClose();
-          }
-        },
-        onClose: () => {
-          toast.error("Payment cancelled");
+        if ((window as any).FlutterwaveCheckout) {
+          (window as any).FlutterwaveCheckout(flutterwaveConfig);
+        } else {
+          toast.error("Flutterwave is not available. Please try Paystack.");
           setLoading(false);
-        },
-      });
+        }
+      } else {
+        // Initialize Paystack
+        const handler = (window as any).PaystackPop?.setup({
+          key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+          email: authUser.email,
+          amount: selectedPlan.price * 100, // Convert to kobo
+          currency: "NGN",
+          ref: reference,
+          metadata: {
+            plan_id: selectedPlan.id,
+            creator_id: creatorId,
+            user_id: user.id,
+          },
+          callback: async (response: any) => {
+            toast.success("Payment successful! Processing subscription...");
+            
+            const { error: processError } = await supabase.functions.invoke(
+              "process-subscription",
+              {
+                body: {
+                  reference: response.reference,
+                  plan_id: selectedPlan.id,
+                  creator_id: creatorId,
+                },
+              }
+            );
 
-      handler.openIframe();
+            if (processError) {
+              toast.error("Failed to activate subscription");
+            } else {
+              toast.success(`Successfully subscribed to ${selectedPlan.name}!`);
+              onSuccess();
+              onClose();
+            }
+          },
+          onClose: () => {
+            toast.error("Payment cancelled");
+            setLoading(false);
+          },
+        });
+
+        if (handler) {
+          handler.openIframe();
+        } else {
+          toast.error("Paystack is not available. Please try again.");
+          setLoading(false);
+        }
+      }
     } catch (error: any) {
       console.error("Card payment error:", error);
       toast.error(error.message || "Failed to initiate payment");
@@ -293,8 +357,10 @@ export const SubscriptionModalV2 = ({
   const handleProceed = () => {
     if (paymentMethod === "wallet") {
       handleWalletPayment();
+    } else if (paymentMethod === "flutterwave") {
+      handleCardPayment('flutterwave');
     } else {
-      handleCardPayment();
+      handleCardPayment('paystack');
     }
   };
 
@@ -355,28 +421,39 @@ export const SubscriptionModalV2 = ({
                     <label className="text-sm font-medium mb-2 block">
                       Payment Method
                     </label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
                       <Button
                         type="button"
                         variant={paymentMethod === "wallet" ? "default" : "outline"}
                         onClick={() => setPaymentMethod("wallet")}
-                        className="h-auto py-4"
+                        className="h-auto py-3 sm:py-4"
                       >
-                        <div className="flex flex-col items-center gap-2">
-                          <Wallet className="w-5 h-5" />
-                          <span>Wallet</span>
-                          <span className="text-xs">₦{walletBalance.toLocaleString()}</span>
+                        <div className="flex flex-col items-center gap-1 sm:gap-2">
+                          <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <span className="text-xs sm:text-sm">Wallet</span>
+                          <span className="text-[10px] sm:text-xs">₦{walletBalance.toLocaleString()}</span>
                         </div>
                       </Button>
                       <Button
                         type="button"
                         variant={paymentMethod === "card" ? "default" : "outline"}
                         onClick={() => setPaymentMethod("card")}
-                        className="h-auto py-4"
+                        className="h-auto py-3 sm:py-4"
                       >
-                        <div className="flex flex-col items-center gap-2">
-                          <CreditCard className="w-5 h-5" />
-                          <span>Card</span>
+                        <div className="flex flex-col items-center gap-1 sm:gap-2">
+                          <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <span className="text-xs sm:text-sm">Paystack</span>
+                        </div>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={paymentMethod === "flutterwave" ? "default" : "outline"}
+                        onClick={() => setPaymentMethod("flutterwave" as any)}
+                        className="h-auto py-3 sm:py-4"
+                      >
+                        <div className="flex flex-col items-center gap-1 sm:gap-2">
+                          <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+                          <span className="text-xs sm:text-sm">Flutterwave</span>
                         </div>
                       </Button>
                     </div>

@@ -3,6 +3,8 @@
  * 
  * Provides client-side content validation and warnings for user-generated content
  * to help maintain platform safety and community guidelines.
+ * 
+ * NOTE: Adult nudity is ALLOWED on this platform. Only illegal/harmful content is blocked.
  */
 
 export interface ModerationResult {
@@ -12,7 +14,8 @@ export interface ModerationResult {
 }
 
 /**
- * Validates text content for inappropriate language, harassment, or spam
+ * Validates text content for harassment, threats, or illegal content
+ * Adult content and nudity are ALLOWED - only harmful/illegal content is blocked
  */
 export const moderateText = (text: string): ModerationResult => {
   const result: ModerationResult = {
@@ -25,50 +28,62 @@ export const moderateText = (text: string): ModerationResult => {
     return result;
   }
 
-  const lowerText = text.toLowerCase();
+  // CRITICAL: Block child exploitation and abuse content (CSAM indicators)
+  const csam_patterns = [
+    /\b(child|kid|minor|underage|young|little)\s*(porn|sex|nude|naked|abuse)\b/gi,
+    /\b(cp|pedo|pedophile|paedophile|lolita)\b/gi,
+    /\b(preteen|pre-teen)\s*(nude|naked|sex)\b/gi,
+  ];
 
-  // Enhanced harassment and bullying patterns
+  // Block extreme illegal content
+  const illegalPatterns = [
+    /\b(bestiality|zoophilia|animal\s*sex)\b/gi,
+    /\b(snuff|murder\s*porn|real\s*death)\b/gi,
+    /\b(rape|forced\s*sex|non-?consensual)\b/gi,
+    /\b(human\s*trafficking|sex\s*slave)\b/gi,
+  ];
+
+  // Harassment and threats (block immediately)
   const harassmentPatterns = [
     /\b(kill yourself|kys|die|hurt yourself|suicide|hang yourself)\b/gi,
-    /\b(ugly|disgusting|hideous|repulsive|worthless|pathetic|loser)\b/gi,
     /\b(nobody likes you|everyone hates you|waste of space)\b/gi,
-    /\b(fat|obese|pig|cow)\s*(ass|bitch|fuck|shit)?\b/gi,
-    /\b(stupid|dumb|idiot|moron|retard)\s*(bitch|fuck|ass)?\b/gi,
   ];
 
-  // Explicit offensive and hate speech
-  const offensivePatterns = [
-    /\b(fuck|shit|bitch|cunt|dick|pussy|cock|whore|slut)\b/gi,
-    /\b(nigger|nigga|fag|faggot|tranny)\b/gi,
-  ];
-
-  // Cyberbullying and intimidation
+  // Cyberbullying and threats
   const bullyingPatterns = [
     /\b(i will (find|get|hurt|beat|kill) you)\b/gi,
     /\b(watch your back|you're dead|threat|attack)\b/gi,
     /\b(exposed|leak|share your|post your)\s*(nudes|pictures|photos|address)\b/gi,
+    /\b(dox|doxx|swat)\b/gi,
   ];
 
-  // Sexual harassment
-  const sexualHarassmentPatterns = [
-    /\b(send (nudes|pics|photos)|show me your|wanna (fuck|sex))\b/gi,
-    /\b(dick pic|pussy pic|tits|boobs)\b/gi,
-  ];
+  // Check CSAM (highest priority - block immediately)
+  for (const pattern of csam_patterns) {
+    if (pattern.test(text)) {
+      result.isAllowed = false;
+      result.warnings.push("Content involving minors is strictly prohibited and illegal.");
+      result.reasons.push("csam");
+      return result;
+    }
+  }
 
-  // Spam and scam patterns
-  const spamPatterns = [
-    /(click here|buy now|limited offer|act now|make money fast)/gi,
-    /\b(http|https|www\.)[^\s]+/gi, // URLs
-    /(\$\$\$|!!!!!|FREE FREE FREE)/gi,
-  ];
+  // Check illegal content
+  for (const pattern of illegalPatterns) {
+    if (pattern.test(text)) {
+      result.isAllowed = false;
+      result.warnings.push("This content violates our terms and is not allowed.");
+      result.reasons.push("illegal_content");
+      return result;
+    }
+  }
 
-  // Check harassment (highest priority - block immediately)
+  // Check harassment
   for (const pattern of harassmentPatterns) {
     if (pattern.test(text)) {
       result.isAllowed = false;
-      result.warnings.push("Your message contains harassment or bullying. This is not allowed.");
+      result.warnings.push("Your message contains harassment. This is not allowed.");
       result.reasons.push("harassment");
-      break;
+      return result;
     }
   }
 
@@ -78,30 +93,16 @@ export const moderateText = (text: string): ModerationResult => {
       result.isAllowed = false;
       result.warnings.push("Your message contains threats or intimidation. This is not allowed.");
       result.reasons.push("bullying");
-      break;
+      return result;
     }
   }
 
-  // Check sexual harassment
-  for (const pattern of sexualHarassmentPatterns) {
-    if (pattern.test(text)) {
-      result.isAllowed = false;
-      result.warnings.push("Your message contains inappropriate sexual content. This is not allowed.");
-      result.reasons.push("sexual_harassment");
-      break;
-    }
-  }
+  // Spam patterns (warning only)
+  const spamPatterns = [
+    /(click here|buy now|limited offer|act now|make money fast)/gi,
+    /(\$\$\$|!!!!!|FREE FREE FREE)/gi,
+  ];
 
-  // Check offensive language (warning, but allow)
-  for (const pattern of offensivePatterns) {
-    if (pattern.test(text)) {
-      result.warnings.push("Your message contains offensive language that may violate community guidelines");
-      result.reasons.push("offensive_language");
-      break;
-    }
-  }
-
-  // Check spam
   for (const pattern of spamPatterns) {
     if (pattern.test(text)) {
       result.warnings.push("Your message may be flagged as spam");
@@ -115,7 +116,7 @@ export const moderateText = (text: string): ModerationResult => {
 
 /**
  * Validates image files before upload
- * Checks file size, type, and provides guidance on acceptable content
+ * Checks file size and type - adult content is ALLOWED
  */
 export const moderateImageFile = (file: File): ModerationResult => {
   const result: ModerationResult = {
@@ -142,11 +143,6 @@ export const moderateImageFile = (file: File): ModerationResult => {
     return result;
   }
 
-  // Add general content policy reminder
-  result.warnings.push(
-    "Please ensure your image follows our content policy: No nudity, violence, harassment, or illegal content"
-  );
-
   return result;
 };
 
@@ -156,12 +152,12 @@ export const moderateImageFile = (file: File): ModerationResult => {
 export const COMMUNITY_GUIDELINES = {
   title: "Community Content Guidelines",
   rules: [
-    "No nudity or sexually explicit content",
-    "No violence, gore, or graphic content",
-    "No harassment, bullying, or hate speech",
+    "No content involving minors in any context",
+    "No bestiality or animal abuse content",
+    "No violence, gore, or non-consensual content",
+    "No harassment, bullying, or doxxing",
     "No spam, scams, or misleading content",
-    "No illegal activities or content",
-    "Respect others' privacy and dignity",
+    "Respect others' privacy and consent",
   ],
   consequences: "Violating these guidelines may result in content removal, account suspension, or permanent ban.",
 };

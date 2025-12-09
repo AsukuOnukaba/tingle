@@ -518,18 +518,18 @@ const Profile = () => {
             </TabsContent>
 
             <TabsContent value="about">
-              <Card className="glass-card border-border/50">
-                <CardContent className="p-6">
+              <Card className="glass-card border-border/50 overflow-hidden">
+                <CardContent className="p-4 sm:p-6">
                   <h3 className="text-xl font-semibold mb-4">About {displayName}</h3>
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-medium mb-2">Bio</h4>
-                      <p className="text-muted-foreground">{bio}</p>
+                      <p className="text-muted-foreground break-words whitespace-pre-wrap">{bio}</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <h4 className="font-medium mb-2">Location</h4>
-                        <p className="text-muted-foreground">{location}</p>
+                        <p className="text-muted-foreground break-words">{location}</p>
                       </div>
                       <div>
                         <h4 className="font-medium mb-2">Member Since</h4>
@@ -539,10 +539,12 @@ const Profile = () => {
                         <h4 className="font-medium mb-2">Age</h4>
                         <p className="text-muted-foreground">{profile.age} years old</p>
                       </div>
-                      {isCreator && profile.price && (
+                      {isCreator && creatorPlans.length > 0 && (
                         <div>
-                          <h4 className="font-medium mb-2">Subscription Price</h4>
-                          <p className="text-muted-foreground">₦{Number(profile.price).toLocaleString()}/month</p>
+                          <h4 className="font-medium mb-2">Subscription</h4>
+                          <p className="text-muted-foreground">
+                            Starts at ₦{Number(creatorPlans[0].price).toLocaleString()}/month
+                          </p>
                         </div>
                       )}
                     </div>

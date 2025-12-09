@@ -15,6 +15,8 @@ interface Message {
   sender: "user" | "creator";
   timestamp: Date;
   type?: "text" | "tip" | "unlock";
+  delivery_status?: "sent" | "delivered" | "read";
+  is_read?: boolean;
 }
 
 interface Profile {
@@ -28,12 +30,15 @@ type DBMessage = Database["public"]["Tables"]["messages"]["Row"];
 
 const mapDbMessageToMessage = (row: DBMessage, currentUserId: string | null): Message => {
   const senderRole = row.sender_id === currentUserId ? "user" : "creator";
+  const dbRow = row as any;
   return {
     id: String(row.id),
     text: String(row.text ?? ""),
     sender: senderRole,
     timestamp: new Date(row.created_at ?? Date.now()),
     type: (row.type ?? "text") as Message["type"],
+    delivery_status: (dbRow.delivery_status as "sent" | "delivered" | "read") ?? "sent",
+    is_read: row.is_read ?? false,
   };
 };
 
@@ -104,7 +109,7 @@ const Chat = () => {
     };
   }, [recipientId]);
 
-  // ---------- Fetch Messages ----------
+  // ---------- Fetch Messages & Mark as Read ----------
   useEffect(() => {
     if (!recipientId || !currentProfileId) return;
 
@@ -130,6 +135,18 @@ const Chat = () => {
 
           setMessages(formatted);
           scrollToBottom();
+
+          // Mark unread messages as read
+          const unreadIds = data
+            .filter((m: any) => m.recipient_id === currentProfileId && !m.is_read)
+            .map((m: any) => m.id);
+
+          if (unreadIds.length > 0) {
+            await supabase
+              .from("messages")
+              .update({ is_read: true, read_at: new Date().toISOString() })
+              .in("id", unreadIds);
+          }
         }
       } catch (err) {
         console.error("Fetch messages failed:", err);
@@ -359,9 +376,22 @@ const Chat = () => {
               <div key={message.id} className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} animate-fade-up`}>
                 <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${message.sender === "user" ? message.type === "tip" ? "gradient-secondary text-white" : "gradient-primary text-white" : "glass-card text-foreground"} ${message.type === "tip" ? "neon-glow" : ""}`}>
                   <p className="text-sm leading-relaxed">{message.text}</p>
-                  <p className={`text-xs mt-2 ${message.sender === "user" ? "gradient-primary" : "text-muted-foreground"}`}>
-                    {formatTime(message.timestamp)}
-                  </p>
+                  <div className={`flex items-center justify-end gap-1 mt-2`}>
+                    <p className={`text-xs ${message.sender === "user" ? "text-white/70" : "text-muted-foreground"}`}>
+                      {formatTime(message.timestamp)}
+                    </p>
+                    {message.sender === "user" && (
+                      <span className="text-xs">
+                        {message.is_read ? (
+                          <span className="text-blue-300">✓✓</span>
+                        ) : message.delivery_status === "delivered" ? (
+                          <span className="text-white/70">✓✓</span>
+                        ) : (
+                          <span className="text-white/50">✓</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
