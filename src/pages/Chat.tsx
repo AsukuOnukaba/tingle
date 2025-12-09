@@ -52,6 +52,40 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ---------- Update Typing Status ----------
+  const updateTypingStatus = async (typing: boolean) => {
+    if (!currentProfileId || !recipientId) return;
+
+    const conversationId = [currentProfileId, recipientId].sort().join("_");
+
+    await (supabase as any)
+      .from("typing_status")
+      .upsert({
+        conversation_id: conversationId,
+        user_id: currentProfileId,
+        is_typing: typing,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'conversation_id,user_id'
+      });
+  };
+
+  // ---------- Handle Input Change with Typing Indicator ----------
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    updateTypingStatus(true);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      updateTypingStatus(false);
+    }, 2000);
+  };
 
   // ---------- Scroll to Bottom ----------
   const scrollToBottom = () => {
@@ -159,6 +193,36 @@ const Chat = () => {
     };
   }, [recipientId, currentProfileId]);
 
+  // ---------- Subscribe to Typing Indicators ----------
+  useEffect(() => {
+    if (!recipientId || !currentProfileId) return;
+
+    const conversationId = [currentProfileId, recipientId].sort().join("_");
+
+    const typingChannel = supabase
+      .channel(`typing_${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "typing_status",
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const typing = payload.new as any;
+          if (typing && typing.user_id === recipientId) {
+            setIsTyping(typing.is_typing);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(typingChannel);
+    };
+  }, [recipientId, currentProfileId]);
+
   // ---------- Subscribe to Real-time Messages ----------
   useEffect(() => {
     if (!recipientId || !currentProfileId) return;
@@ -242,6 +306,7 @@ const Chat = () => {
     };
     setMessages((prev) => [...prev, tempMessage]);
     setNewMessage("");
+    updateTypingStatus(false);
     scrollToBottom();
 
     try {
@@ -466,7 +531,7 @@ const Chat = () => {
 
               <Input 
                 value={newMessage} 
-                onChange={(e) => setNewMessage(e.target.value)} 
+                onChange={handleInputChange} 
                 placeholder={profile?.is_online ? "Type a message..." : "Creator is offline..."} 
                 className="flex-1 bg-muted/50 border-border/50 focus:border-primary transition-smooth"
                 disabled={!profile?.is_online}
