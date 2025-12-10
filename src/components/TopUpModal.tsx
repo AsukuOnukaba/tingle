@@ -213,64 +213,57 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
           </TabsContent>
 
           <TabsContent value="crypto" className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="crypto-amount">Amount (USD)</Label>
-              <Input
-                id="crypto-amount"
-                type="number"
-                placeholder="Enter amount"
-                min="0"
-                step="0.01"
-                disabled
-              />
+            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <h3 className="font-semibold mb-2 flex items-center gap-2">
+                <Bitcoin className="w-5 h-5 text-orange-500" />
+                Deposit Cryptocurrency
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Send crypto to your connected wallet address. Deposits are automatically detected and credited to your wallet.
+              </p>
             </div>
 
             <div className="space-y-3">
-              <Label>Select Cryptocurrency</Label>
+              <Label>Supported Networks</Label>
               <div className="grid gap-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left"
-                  disabled
-                >
-                  <Bitcoin className="w-5 h-5 mr-3 text-orange-500" />
-                  <div className="flex-1">
-                    <div className="font-medium">Bitcoin (BTC)</div>
-                    <div className="text-xs text-muted-foreground">Coming Soon</div>
-                  </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left"
-                  disabled
-                >
-                  <div className="w-5 h-5 mr-3 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                    E
+                <div className="p-3 rounded-lg border border-border bg-background flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                    Ξ
                   </div>
                   <div className="flex-1">
-                    <div className="font-medium">Ethereum (ETH)</div>
-                    <div className="text-xs text-muted-foreground">Coming Soon</div>
+                    <div className="font-medium">Ethereum / Base / Polygon</div>
+                    <div className="text-xs text-muted-foreground">ETH, USDT, USDC supported</div>
                   </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left"
-                  disabled
-                >
-                  <div className="w-5 h-5 mr-3 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold">
-                    ₮
+                </div>
+                <div className="p-3 rounded-lg border border-border bg-background flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white text-sm font-bold">
+                    ◎
                   </div>
                   <div className="flex-1">
-                    <div className="font-medium">Tether (USDT)</div>
-                    <div className="text-xs text-muted-foreground">Coming Soon</div>
+                    <div className="font-medium">Solana</div>
+                    <div className="text-xs text-muted-foreground">SOL, USDT, USDC supported</div>
                   </div>
-                </Button>
+                </div>
               </div>
             </div>
 
-            <div className="p-4 bg-muted rounded-lg text-sm text-center text-muted-foreground">
-              Cryptocurrency payments will be available soon. Stay tuned!
+            <div className="p-4 bg-muted rounded-lg text-sm">
+              <p className="font-medium mb-2">How it works:</p>
+              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                <li>Go to the "Addresses" tab in your Wallet</li>
+                <li>Connect your wallet or copy your deposit address</li>
+                <li>Send crypto to that address</li>
+                <li>Balance updates automatically after confirmation</li>
+              </ol>
             </div>
+
+            <Button 
+              onClick={() => onOpenChange(false)} 
+              className="w-full" 
+              variant="outline"
+            >
+              Go to Wallet Addresses
+            </Button>
           </TabsContent>
         </Tabs>
       </DialogContent>

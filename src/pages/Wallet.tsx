@@ -322,19 +322,25 @@ const Wallet = () => {
                       </Button>
                     </div>
 
-                    {/* Crypto - Coming Soon */}
-                    <div className="p-5 rounded-xl border border-border bg-muted/30">
+                    {/* Crypto Deposit */}
+                    <div className="p-5 rounded-xl border-2 border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-colors">
                       <div className="flex items-center gap-4 mb-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-xl">
-                          ₿
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-xl">
+                          ◎
                         </div>
                         <div>
                           <h3 className="font-semibold text-lg">Crypto Deposit</h3>
-                          <p className="text-sm text-muted-foreground">BTC, ETH, SOL • Coming Soon</p>
+                          <p className="text-sm text-muted-foreground">ETH, SOL, USDT • Auto-detected</p>
                         </div>
                       </div>
-                      <Button disabled className="w-full" size="lg" variant="outline">
-                        Coming Soon
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Send crypto to your connected wallet address. Balance updates automatically.
+                      </p>
+                      <Button className="w-full" size="lg" variant="outline" onClick={() => {
+                        const addressTab = document.querySelector('[value="addresses"]') as HTMLElement;
+                        addressTab?.click();
+                      }}>
+                        View Deposit Addresses
                       </Button>
                     </div>
                   </div>
