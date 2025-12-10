@@ -62,16 +62,28 @@ serve(async (req) => {
       throw new Error('Plan not found');
     }
 
+    // Get the creator record to get the internal creator id
+    const { data: creatorData, error: creatorFetchError } = await supabaseClient
+      .from('creators')
+      .select('id, user_id')
+      .eq('user_id', creator_id)
+      .single();
+
+    if (creatorFetchError || !creatorData) {
+      console.error('Creator fetch error:', creatorFetchError);
+      throw new Error('Creator not found');
+    }
+
     // Calculate expiry date
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + plan.duration_days);
 
-    // Create or update subscription
+    // Create or update subscription (use creator's user_id for consistency)
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .upsert({
         subscriber_id: user.id,
-        creator_id: creator_id,
+        creator_id: creator_id, // This is the user_id of the creator
         plan_id: plan_id,
         amount_paid: amount,
         is_active: true,
@@ -136,20 +148,32 @@ serve(async (req) => {
       console.error('Payment intent update error:', intentError);
     }
 
-    // Credit creator's pending balance (commission deducted)
+    // Credit creator's pending balance (commission deducted) - use internal creator id
     const commission = amount * 0.15; // 15% platform fee
     const creatorEarnings = amount - commission;
 
-    const { error: creatorError } = await supabaseClient
+    // First get current balance
+    const { data: currentCreator } = await supabaseClient
       .from('creators')
-      .update({
-        pending_balance: supabaseClient.rpc('increment', { x: creatorEarnings }),
-        total_earned: supabaseClient.rpc('increment', { x: creatorEarnings }),
-      })
-      .eq('id', creator_id);
+      .select('pending_balance, total_earned')
+      .eq('id', creatorData.id)
+      .single();
 
-    if (creatorError) {
-      console.error('Creator balance update error:', creatorError);
+    if (currentCreator) {
+      const newPendingBalance = (currentCreator.pending_balance || 0) + creatorEarnings;
+      const newTotalEarned = (currentCreator.total_earned || 0) + creatorEarnings;
+
+      const { error: creatorError } = await supabaseClient
+        .from('creators')
+        .update({
+          pending_balance: newPendingBalance,
+          total_earned: newTotalEarned,
+        })
+        .eq('id', creatorData.id);
+
+      if (creatorError) {
+        console.error('Creator balance update error:', creatorError);
+      }
     }
 
     console.log('Subscription processed successfully');
