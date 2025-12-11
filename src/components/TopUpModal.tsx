@@ -89,10 +89,26 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
       // Poll for payment completion
       toast({
         title: "Payment Gateway Opened",
-        description: "Complete your payment in the new window",
+        description: "Complete your payment in the new window. This may take a moment.",
       });
 
+      let pollCount = 0;
+      const maxPolls = 60; // 5 minutes with 5-second intervals
+      
       const pollInterval = setInterval(async () => {
+        pollCount++;
+        
+        if (pollCount > maxPolls) {
+          clearInterval(pollInterval);
+          setLoading(false);
+          toast({
+            title: "Payment Timeout",
+            description: "Please check your transaction history or try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         try {
           const { data: { session: currentSession } } = await supabase.auth.getSession();
           
@@ -103,28 +119,49 @@ export const TopUpModal = ({ open, onOpenChange, onSuccess }: TopUpModalProps) =
             },
           });
 
-          if (!verifyResponse.error) {
+          // Check if payment is pending (202 status)
+          if (verifyResponse.data?.pending) {
+            // Payment still pending, continue polling
+            return;
+          }
+
+          if (!verifyResponse.error && verifyResponse.data?.success) {
             clearInterval(pollInterval);
             setLoading(false);
             
+            const creditedAmount = verifyResponse.data.amount || amountValue;
+            
             toast({
-              title: "Top-up Successful",
-              description: `Your wallet has been credited with ₦${amountValue.toLocaleString()}`,
+              title: "Top-up Successful!",
+              description: `Your wallet has been credited with ₦${creditedAmount.toLocaleString()}`,
             });
 
             setAmount("");
             onOpenChange(false);
             onSuccess?.();
+          } else if (verifyResponse.error && !verifyResponse.data?.pending) {
+            // Real error, not just pending
+            const errorMsg = verifyResponse.data?.error || verifyResponse.error?.message;
+            if (errorMsg && !errorMsg.includes('pending')) {
+              console.log('Verification status:', errorMsg);
+            }
           }
         } catch (error) {
           // Payment not yet completed, continue polling
+          console.log('Poll attempt', pollCount, '- awaiting payment completion');
         }
-      }, 3000);
+      }, 5000); // Poll every 5 seconds
 
-      // Stop polling after 5 minutes
-      setTimeout(() => {
+      // Store interval for cleanup
+      const timeoutId = setTimeout(() => {
         clearInterval(pollInterval);
-        setLoading(false);
+        if (loading) {
+          setLoading(false);
+          toast({
+            title: "Payment Status Unknown",
+            description: "Please check your wallet balance. If not updated, contact support.",
+          });
+        }
       }, 5 * 60 * 1000);
     } catch (error) {
       console.error('Top-up error:', error);

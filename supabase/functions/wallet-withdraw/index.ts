@@ -31,6 +31,9 @@ function checkRateLimit(identifier: string, maxAttempts: number, windowMs: numbe
   return false;
 }
 
+// Platform withdrawal fee percentage (20%)
+const PLATFORM_FEE_PERCENTAGE = 0.20;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -45,6 +48,11 @@ serve(async (req) => {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
+    );
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
@@ -66,42 +74,48 @@ serve(async (req) => {
       throw new Error('INVALID_AMOUNT');
     }
 
+    // Minimum withdrawal amount
+    if (amount < 1000) {
+      throw new Error('MINIMUM_WITHDRAWAL');
+    }
+
     if (!recipient_code || typeof recipient_code !== 'string' || !recipient_code.match(/^RCP_[a-zA-Z0-9]+$/)) {
       throw new Error('INVALID_RECIPIENT');
     }
 
-    // Secure logging - avoid exposing user IDs and amounts
-    if (Deno.env.get('DEBUG_MODE') === 'true') {
-      console.log('Processing withdrawal request');
-    }
-
-    // Verify user is a creator
-    const { data: creator, error: creatorError } = await supabaseClient
-      .from('creators')
-      .select('*')
+    // Check user's wallet balance
+    const { data: wallet, error: walletError } = await supabaseAdmin
+      .from('wallets')
+      .select('balance')
       .eq('user_id', user.id)
       .single();
 
-    if (creatorError || !creator) {
-      throw new Error('CREATOR_ONLY');
+    if (walletError || !wallet) {
+      throw new Error('WALLET_NOT_FOUND');
+    }
+
+    if (wallet.balance < amount) {
+      throw new Error('INSUFFICIENT_BALANCE');
     }
 
     // Calculate platform commission (20%)
-    const commission = amount * 0.20;
-    const netAmount = amount - commission;
+    const platformFee = Math.ceil(amount * PLATFORM_FEE_PERCENTAGE);
+    const netAmount = amount - platformFee;
     const reference = `WD-${Date.now()}-${user.id.substring(0, 8)}`;
 
+    console.log(`Processing withdrawal: amount=₦${amount}, fee=₦${platformFee} (20%), net=₦${netAmount}`);
+
     // Create withdrawal request first (before debiting wallet)
-    const { data: withdrawalRequest, error: requestError } = await supabaseClient
+    const { data: withdrawalRequest, error: requestError } = await supabaseAdmin
       .from('withdrawal_requests')
       .insert({
         user_id: user.id,
         amount,
         net_amount: netAmount,
-        commission,
+        commission: platformFee,
         recipient_code,
         reference,
-        status: 'pending'
+        status: 'processing'
       })
       .select()
       .single();
@@ -112,7 +126,7 @@ serve(async (req) => {
     }
 
     try {
-      // Initiate Paystack transfer first
+      // Initiate Paystack transfer
       const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
       const transferResponse = await fetch(
         'https://api.paystack.co/transfer',
@@ -124,28 +138,25 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             source: 'balance',
-            amount: netAmount * 100,
+            amount: netAmount * 100, // Convert to kobo
             recipient: recipient_code,
             reference,
-            reason: 'Creator withdrawal',
+            reason: `Tingle Withdrawal - Fee: ₦${platformFee.toLocaleString()} (20%)`,
           }),
         }
       );
 
       const transferData = await transferResponse.json();
-      
-      // Secure logging - no sensitive payment data
-      if (Deno.env.get('DEBUG_MODE') === 'true') {
-        console.log('Transfer response received, status:', transferData.status);
-      }
+      console.log('Paystack transfer response:', JSON.stringify(transferData));
 
       if (!transferData.status) {
         // Update withdrawal request with error
-        await supabaseClient
+        await supabaseAdmin
           .from('withdrawal_requests')
           .update({ 
             status: 'failed',
-            error_message: transferData.message || 'Transfer failed'
+            error_message: transferData.message || 'Transfer failed',
+            updated_at: new Date().toISOString(),
           })
           .eq('id', withdrawalRequest.id);
         
@@ -153,22 +164,23 @@ serve(async (req) => {
       }
 
       // Transfer initiated successfully, now debit wallet
-      const { data: debitResult, error: debitError } = await supabaseClient
+      const { data: debitResult, error: debitError } = await supabaseAdmin
         .rpc('debit_wallet', {
           p_user_id: user.id,
           p_amount: amount,
           p_reference: reference,
-          p_description: `Withdrawal (Net: ${netAmount} NGN, Fee: ${commission} NGN)`
+          p_description: `Withdrawal - Platform fee: ₦${platformFee.toLocaleString()} (20%)`
         });
 
       if (debitError) {
         console.error('Error debiting wallet:', debitError);
         // Mark withdrawal as failed
-        await supabaseClient
+        await supabaseAdmin
           .from('withdrawal_requests')
           .update({ 
             status: 'failed',
-            error_message: 'Failed to debit wallet'
+            error_message: 'Failed to debit wallet',
+            updated_at: new Date().toISOString(),
           })
           .eq('id', withdrawalRequest.id);
         
@@ -176,22 +188,34 @@ serve(async (req) => {
       }
 
       // Update withdrawal request as completed
-      await supabaseClient
+      await supabaseAdmin
         .from('withdrawal_requests')
         .update({ 
           status: 'completed',
-          transfer_code: transferData.data.transfer_code
+          transfer_code: transferData.data?.transfer_code,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', withdrawalRequest.id);
+
+      console.log('Withdrawal successful:', {
+        reference,
+        amount,
+        platformFee,
+        netAmount,
+        newBalance: debitResult.new_balance,
+      });
 
       return new Response(
         JSON.stringify({
           success: true,
+          message: 'Withdrawal processed successfully',
           amount,
+          platform_fee: platformFee,
+          fee_percentage: '20%',
           net_amount: netAmount,
-          commission,
-          transfer_code: transferData.data.transfer_code,
+          transfer_code: transferData.data?.transfer_code,
           new_balance: debitResult.new_balance,
+          reference,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -200,11 +224,12 @@ serve(async (req) => {
       );
     } catch (innerError) {
       // If anything fails, ensure withdrawal request is marked as failed
-      await supabaseClient
+      await supabaseAdmin
         .from('withdrawal_requests')
         .update({ 
           status: 'failed',
-          error_message: innerError instanceof Error ? innerError.message : 'Unknown error'
+          error_message: innerError instanceof Error ? innerError.message : 'Unknown error',
+          updated_at: new Date().toISOString(),
         })
         .eq('id', withdrawalRequest.id);
       
@@ -218,12 +243,14 @@ serve(async (req) => {
     const errorMap: Record<string, string> = {
       'UNAUTHORIZED': 'Authentication required',
       'INVALID_AMOUNT': 'Invalid withdrawal amount',
-      'INVALID_RECIPIENT': 'Invalid recipient code',
-      'CREATOR_ONLY': 'Only creators can withdraw funds',
+      'MINIMUM_WITHDRAWAL': 'Minimum withdrawal amount is ₦1,000',
+      'INVALID_RECIPIENT': 'Invalid recipient code. Please create a recipient first.',
+      'WALLET_NOT_FOUND': 'Wallet not found',
+      'INSUFFICIENT_BALANCE': 'Insufficient wallet balance',
       'REQUEST_FAILED': 'Failed to create withdrawal request',
-      'TRANSFER_FAILED': 'Transfer initiation failed',
-      'DEBIT_FAILED': 'Insufficient balance',
-      'RATE_LIMIT_EXCEEDED': 'Too many requests. Please try again later.',
+      'TRANSFER_FAILED': 'Transfer initiation failed. Please try again.',
+      'DEBIT_FAILED': 'Failed to process withdrawal',
+      'RATE_LIMIT_EXCEEDED': 'Too many withdrawal attempts. Please try again later.',
     };
     
     const errorCode = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
