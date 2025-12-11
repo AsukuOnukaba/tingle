@@ -87,7 +87,22 @@ const SubscriptionPlans = () => {
     setProcessingPlanId(plan.id);
 
     try {
-      // Create payment intent
+      // First, look up the actual creator record ID from the creators table
+      // The creatorId from URL is the user's profile ID, not the creator's table ID
+      const { data: creatorRecord, error: creatorLookupError } = await (supabase as any)
+        .from('creators')
+        .select('id')
+        .eq('user_id', creatorId)
+        .eq('status', 'approved')
+        .single();
+
+      if (creatorLookupError || !creatorRecord) {
+        throw new Error('Creator not found or not approved');
+      }
+
+      const actualCreatorId = creatorRecord.id;
+
+      // Create payment intent with the correct creator table ID
       const reference = `SUB-${Date.now()}-${user.id.slice(0, 8)}`;
       
       const { error: intentError } = await (supabase as any)
@@ -95,7 +110,7 @@ const SubscriptionPlans = () => {
         .insert({
           user_id: user.id,
           plan_id: plan.id,
-          creator_id: creatorId,
+          creator_id: actualCreatorId, // Use the actual creator table ID
           amount: plan.price,
           reference,
           status: "pending",

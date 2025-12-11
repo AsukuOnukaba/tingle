@@ -53,8 +53,8 @@ serve(async (req) => {
       throw new Error('UNAUTHORIZED');
     }
 
-    // Rate limiting: 5 top-ups per hour per user
-    if (checkRateLimit(`topup:${user.id}`, 5, 60 * 60 * 1000)) {
+    // Rate limiting: 50 top-ups per hour per user (higher for polling)
+    if (checkRateLimit(`topup:${user.id}`, 50, 60 * 60 * 1000)) {
       throw new Error('RATE_LIMIT_EXCEEDED');
     }
 
@@ -70,10 +70,7 @@ serve(async (req) => {
     // Determine gateway from reference
     const gateway = reference.startsWith('FLW-') ? 'flutterwave' : 'paystack';
 
-    // Secure logging - avoid sensitive data exposure
-    if (Deno.env.get('DEBUG_MODE') === 'true') {
-      console.log('Processing payment verification');
-    }
+    console.log(`Verifying ${gateway} payment: ${reference}`);
 
     // Check for duplicate using idempotency
     const supabaseAdmin = createClient(
@@ -89,10 +86,22 @@ serve(async (req) => {
 
     if (existingTx) {
       console.log('Duplicate transaction detected:', reference);
-      throw new Error('DUPLICATE_TRANSACTION');
+      // Return success for duplicate (idempotent behavior)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Transaction already processed',
+          duplicate: true,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
     let amount: number;
+    let paymentStatus: string;
 
     // Verify payment based on gateway
     if (gateway === 'flutterwave') {
@@ -107,9 +116,25 @@ serve(async (req) => {
       );
 
       const verifyData = await verifyResponse.json();
+      console.log('Flutterwave verification response:', JSON.stringify(verifyData));
 
-      if (verifyData.status !== 'success' || verifyData.data.status !== 'successful') {
+      // Check if payment is still pending
+      if (verifyData.status === 'error' && verifyData.message?.includes('No transaction')) {
+        throw new Error('PAYMENT_PENDING');
+      }
+
+      if (verifyData.status !== 'success') {
         throw new Error('PAYMENT_VERIFICATION_FAILED');
+      }
+
+      paymentStatus = verifyData.data?.status;
+      
+      if (paymentStatus === 'pending') {
+        throw new Error('PAYMENT_PENDING');
+      }
+      
+      if (paymentStatus !== 'successful') {
+        throw new Error('PAYMENT_NOT_SUCCESSFUL');
       }
 
       amount = verifyData.data.amount;
@@ -126,31 +151,46 @@ serve(async (req) => {
       );
 
       const verifyData = await verifyResponse.json();
+      console.log('Paystack verification response status:', verifyData.status, 'data.status:', verifyData.data?.status);
 
-      if (!verifyData.status || verifyData.data.status !== 'success') {
-        throw new Error('PAYMENT_VERIFICATION_FAILED');
+      if (!verifyData.status) {
+        // Transaction doesn't exist yet or invalid
+        throw new Error('PAYMENT_PENDING');
+      }
+
+      paymentStatus = verifyData.data?.status;
+
+      if (paymentStatus === 'pending' || paymentStatus === 'ongoing' || paymentStatus === 'abandoned') {
+        throw new Error('PAYMENT_PENDING');
+      }
+
+      if (paymentStatus !== 'success') {
+        console.log('Payment not successful, status:', paymentStatus);
+        throw new Error('PAYMENT_NOT_SUCCESSFUL');
       }
 
       // Paystack returns amount in kobo
       amount = verifyData.data.amount / 100;
     }
 
+    console.log(`Payment verified! Amount: ${amount}`);
+
     // Validate amount is reasonable
     if (amount <= 0 || amount > 10000000) {
       throw new Error('INVALID_AMOUNT');
     }
 
-    // Credit user wallet using the database function
-    const { data: creditResult, error: creditError } = await supabaseClient
+    // Credit user wallet using the database function with service role
+    const { data: creditResult, error: creditError } = await supabaseAdmin
       .rpc('credit_wallet', {
         p_user_id: user.id,
         p_amount: amount,
         p_reference: reference,
-        p_description: 'Wallet top-up via Paystack'
+        p_description: `Wallet top-up via ${gateway}`
       });
 
     if (creditError) {
-      console.error('Error crediting wallet - code:', creditError.code);
+      console.error('Error crediting wallet:', creditError);
       throw new Error('Failed to credit wallet');
     }
 
@@ -163,10 +203,7 @@ serve(async (req) => {
       })
       .eq('reference', reference);
 
-    // Secure logging - no sensitive financial data
-    if (Deno.env.get('DEBUG_MODE') === 'true') {
-      console.log('Wallet credit successful');
-    }
+    console.log('Wallet credit successful:', creditResult);
 
     return new Response(
       JSON.stringify({
@@ -184,23 +221,28 @@ serve(async (req) => {
     console.error('Error in wallet-topup function:', error);
     
     // Map errors to user-friendly messages
-    const errorMap: Record<string, string> = {
-      'UNAUTHORIZED': 'Authentication required',
-      'INVALID_REFERENCE': 'Invalid payment reference',
-      'PAYMENT_VERIFICATION_FAILED': 'Payment verification failed',
-      'INVALID_AMOUNT': 'Invalid transaction amount',
-      'RATE_LIMIT_EXCEEDED': 'Too many requests. Please try again later.',
-      'DUPLICATE_TRANSACTION': 'This transaction has already been processed',
+    const errorMap: Record<string, { message: string; status: number }> = {
+      'UNAUTHORIZED': { message: 'Authentication required', status: 401 },
+      'INVALID_REFERENCE': { message: 'Invalid payment reference', status: 400 },
+      'PAYMENT_PENDING': { message: 'Payment is still pending', status: 202 },
+      'PAYMENT_NOT_SUCCESSFUL': { message: 'Payment was not successful', status: 400 },
+      'PAYMENT_VERIFICATION_FAILED': { message: 'Payment verification failed', status: 400 },
+      'INVALID_AMOUNT': { message: 'Invalid transaction amount', status: 400 },
+      'RATE_LIMIT_EXCEEDED': { message: 'Too many requests. Please try again later.', status: 429 },
+      'DUPLICATE_TRANSACTION': { message: 'This transaction has already been processed', status: 200 },
     };
     
     const errorCode = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
-    const userMessage = errorMap[errorCode] || 'Transaction failed. Please try again.';
+    const errorInfo = errorMap[errorCode] || { message: 'Transaction failed. Please try again.', status: 400 };
     
     return new Response(
-      JSON.stringify({ error: userMessage }),
+      JSON.stringify({ 
+        error: errorInfo.message,
+        pending: errorCode === 'PAYMENT_PENDING',
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: errorInfo.status,
       }
     );
   }

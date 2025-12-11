@@ -130,12 +130,27 @@ export const SubscriptionModal = ({
     try {
       const reference = `SUB-${Date.now()}-${user.id.slice(0, 8)}`;
 
-      // Create payment intent (no need to store plan_id since we're using creator_id)
+      // First, look up the actual creator record ID from the creators table
+      // The creatorId prop is actually the user's profile ID, not the creator's table ID
+      const { data: creatorRecord, error: creatorLookupError } = await (supabase as any)
+        .from('creators')
+        .select('id')
+        .eq('user_id', creatorId)
+        .eq('status', 'approved')
+        .single();
+
+      if (creatorLookupError || !creatorRecord) {
+        throw new Error('Creator not found or not approved');
+      }
+
+      const actualCreatorId = creatorRecord.id;
+
+      // Create payment intent with the correct creator table ID
       const { error: intentError } = await (supabase as any)
         .from("payment_intents")
         .insert({
           user_id: user.id,
-          creator_id: creatorId,
+          creator_id: actualCreatorId,
           amount: selectedPrice,
           reference,
           status: "pending",
@@ -163,7 +178,7 @@ export const SubscriptionModal = ({
             .from('subscriptions')
             .upsert({
               subscriber_id: user.id,
-              creator_id: creatorId,
+              creator_id: creatorId, // Use profile ID for subscriptions table
               plan_id: plan.id,
               amount_paid: selectedPrice,
               is_active: true,
