@@ -30,18 +30,31 @@ const PremiumGallery = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user && id) {
-      checkSubscriptionStatus();
-      fetchWalletBalance();
-      fetchCreatorData();
-      fetchPremiumContent();
-    } else {
-      setLoading(false);
-    }
+    const initializeGallery = async () => {
+      if (user && id) {
+        // Always fetch creator data first for display
+        await fetchCreatorData();
+        
+        // Check subscription status first before loading premium content
+        const hasAccess = await checkSubscriptionStatus();
+        if (hasAccess) {
+          fetchWalletBalance();
+          fetchPremiumContent();
+        }
+        setLoading(false);
+      } else {
+        // Even without auth, fetch creator info
+        if (id) {
+          await fetchCreatorData();
+        }
+        setLoading(false);
+      }
+    };
+    initializeGallery();
   }, [user, id]);
 
-  const checkSubscriptionStatus = async () => {
-    if (!id || !user) return;
+  const checkSubscriptionStatus = async (): Promise<boolean> => {
+    if (!id || !user) return false;
     
     try {
       // Check if user has active subscription entitlement for premium content
@@ -61,7 +74,7 @@ const PremiumGallery = () => {
 
       if (entitlements) {
         setHasSubscription(true);
-        return;
+        return true;
       }
 
       // If no entitlements, check subscriptions directly (fallback)
@@ -76,19 +89,23 @@ const PremiumGallery = () => {
       if (subError) {
         console.error('Subscription check error:', subError);
         setHasSubscription(false);
-        return;
+        return false;
       }
 
       if (subscription) {
         const expiryDate = new Date(subscription.expires_at);
         const now = new Date();
-        setHasSubscription(expiryDate > now);
+        const hasAccess = expiryDate > now;
+        setHasSubscription(hasAccess);
+        return hasAccess;
       } else {
         setHasSubscription(false);
+        return false;
       }
     } catch (error) {
       console.error("Error checking subscription status:", error);
       setHasSubscription(false);
+      return false;
     }
   };
 
@@ -204,6 +221,57 @@ const PremiumGallery = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
             <p className="mt-4 text-muted-foreground">Loading content...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Block access if user is not subscribed - show subscription required message
+  if (!hasSubscription && !loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="pt-20 pb-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Button
+              asChild
+              variant="ghost"
+              className="mb-6 hover:bg-muted/50"
+            >
+              <Link to={`/profile/${id}`}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Profile
+              </Link>
+            </Button>
+
+            <Card className="p-8 text-center">
+              {creatorProfile?.profile_image && (
+                <img 
+                  src={creatorProfile.profile_image} 
+                  alt={creatorProfile.display_name}
+                  className="w-20 h-20 rounded-full mx-auto mb-4 object-cover border-2 border-primary"
+                />
+              )}
+              <Lock className="h-12 w-12 mx-auto mb-4 text-primary" />
+              <h2 className="text-2xl font-bold mb-2">Subscription Required</h2>
+              <p className="text-muted-foreground mb-6">
+                {creatorProfile?.display_name 
+                  ? `Subscribe to ${creatorProfile.display_name} to access their premium gallery.`
+                  : 'You need an active subscription to access this creator\'s premium gallery.'}
+                {' '}Unlock exclusive content and benefits.
+              </p>
+              <Button
+                asChild
+                className="w-full gradient-primary"
+                size="lg"
+              >
+                <Link to={`/profile/${id}`}>
+                  <Crown className="w-5 h-5 mr-2" />
+                  Subscribe to {creatorProfile?.display_name || 'Creator'}
+                </Link>
+              </Button>
+            </Card>
           </div>
         </div>
       </div>

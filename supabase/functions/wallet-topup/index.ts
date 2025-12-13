@@ -61,9 +61,16 @@ serve(async (req) => {
     const body = await req.json();
     const { reference } = body;
 
-    // Validate reference format (support both Paystack and Flutterwave)
-    if (!reference || typeof reference !== 'string' || 
-        !reference.match(/^(TOP|FLW-TOP)-\d+-[a-zA-Z0-9]+$/)) {
+    // Validate reference format (support both Paystack and Flutterwave, and generic TOP prefix)
+    if (!reference || typeof reference !== 'string') {
+      throw new Error('INVALID_REFERENCE');
+    }
+    
+    // More flexible reference validation
+    const isValidRef = reference.match(/^(TOP|FLW-TOP|SUB)-\d+-[a-zA-Z0-9]+$/) ||
+                       reference.match(/^[A-Za-z0-9_-]{10,}$/);
+    if (!isValidRef) {
+      console.log('Invalid reference format:', reference);
       throw new Error('INVALID_REFERENCE');
     }
 

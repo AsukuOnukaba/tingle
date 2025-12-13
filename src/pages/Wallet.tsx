@@ -226,17 +226,16 @@ const Wallet = () => {
                       <Plus className="w-5 h-5 mr-2" />
                       Top Up
                     </Button>
-                    {isCreator && (
-                      <Button 
-                        onClick={() => setWithdrawOpen(true)} 
-                        variant="default"
-                        className="w-full h-14 text-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
-                        size="lg"
-                      >
-                        <Minus className="w-5 h-5 mr-2" />
-                        Withdraw
-                      </Button>
-                    )}
+                    <Button 
+                      onClick={() => setWithdrawOpen(true)} 
+                      variant="default"
+                      className="w-full h-14 text-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
+                      size="lg"
+                      disabled={(wallet?.balance || 0) <= 0}
+                    >
+                      <Minus className="w-5 h-5 mr-2" />
+                      Withdraw
+                    </Button>
                   </div>
                 </div>
               </CardContent>
