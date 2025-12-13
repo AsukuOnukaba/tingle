@@ -21,31 +21,61 @@ serve(async (req) => {
 
     console.log('Processing subscription:', { reference, plan_id, creator_id });
 
-    // Verify payment with Paystack
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    const verifyResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        headers: {
-          Authorization: `Bearer ${paystackSecretKey}`,
-        },
+    // Determine gateway from reference
+    const isFlutterwave = reference.startsWith('FLW-');
+    
+    let amount: number;
+    let customerEmail: string;
+
+    if (isFlutterwave) {
+      // Verify payment with Flutterwave
+      const flutterwaveSecret = Deno.env.get('FLUTTERWAVE_SECRET_KEY');
+      const verifyResponse = await fetch(
+        `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${reference}`,
+        {
+          headers: {
+            Authorization: `Bearer ${flutterwaveSecret}`,
+          },
+        }
+      );
+
+      const verifyData = await verifyResponse.json();
+      console.log('Flutterwave verification response:', verifyData.status);
+
+      if (verifyData.status !== 'success' || verifyData.data?.status !== 'successful') {
+        throw new Error('Payment verification failed');
       }
-    );
 
-    const verifyData = await verifyResponse.json();
+      amount = verifyData.data.amount;
+      customerEmail = verifyData.data.customer?.email;
+    } else {
+      // Verify payment with Paystack
+      const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+      const verifyResponse = await fetch(
+        `https://api.paystack.co/transaction/verify/${reference}`,
+        {
+          headers: {
+            Authorization: `Bearer ${paystackSecretKey}`,
+          },
+        }
+      );
 
-    if (!verifyData.status || verifyData.data.status !== 'success') {
-      throw new Error('Payment verification failed');
+      const verifyData = await verifyResponse.json();
+      console.log('Paystack verification response:', verifyData.status, verifyData.data?.status);
+
+      if (!verifyData.status || verifyData.data.status !== 'success') {
+        throw new Error('Payment verification failed');
+      }
+
+      amount = verifyData.data.amount / 100; // Convert from kobo to naira
+      customerEmail = verifyData.data.customer.email;
     }
 
-    const amount = verifyData.data.amount / 100; // Convert from kobo to naira
-    const customer_email = verifyData.data.customer.email;
-
-    console.log('Payment verified:', { amount, customer_email });
+    console.log('Payment verified:', { amount, customerEmail });
 
     // Get user from email
     const { data: { users }, error: userError } = await supabaseClient.auth.admin.listUsers();
-    const user = users?.find(u => u.email === customer_email);
+    const user = users?.find(u => u.email === customerEmail);
 
     if (!user) {
       throw new Error('User not found');
@@ -62,7 +92,8 @@ serve(async (req) => {
       throw new Error('Plan not found');
     }
 
-    // Get the creator record to get the internal creator id
+    // creator_id passed from frontend is the profile/user_id of the creator
+    // We need to get the internal creator record ID for payment_intents FK
     const { data: creatorData, error: creatorFetchError } = await supabaseClient
       .from('creators')
       .select('id, user_id')
@@ -74,16 +105,16 @@ serve(async (req) => {
       throw new Error('Creator not found');
     }
 
-    // Calculate expiry date
+    // Calculate expiry date based on plan
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + plan.duration_days);
 
-    // Create or update subscription (use creator's user_id for consistency)
+    // Create or update subscription (use creator's user_id for subscriptions table)
     const { data: subscription, error: subError } = await supabaseClient
       .from('subscriptions')
       .upsert({
         subscriber_id: user.id,
-        creator_id: creator_id, // This is the user_id of the creator
+        creator_id: creator_id, // This is the user_id of the creator (for subscriptions FK to profiles)
         plan_id: plan_id,
         amount_paid: amount,
         is_active: true,
@@ -99,33 +130,28 @@ serve(async (req) => {
       throw subError;
     }
 
-    // Create subscription entitlements for premium features
-    const entitlements = [
-      {
-        subscription_id: subscription.id,
-        user_id: user.id,
-        creator_id: creator_id,
-        entitlement_type: 'premium_chat',
-        expires_at: expiresAt.toISOString(),
-        is_active: true,
-      },
-      {
-        subscription_id: subscription.id,
-        user_id: user.id,
-        creator_id: creator_id,
-        entitlement_type: 'premium_content',
-        expires_at: expiresAt.toISOString(),
-        is_active: true,
-      },
-      {
-        subscription_id: subscription.id,
-        user_id: user.id,
-        creator_id: creator_id,
-        entitlement_type: 'priority_messages',
-        expires_at: expiresAt.toISOString(),
-        is_active: true,
-      }
-    ];
+    // Parse plan features to determine entitlements
+    const planFeatures = plan.features || [];
+    const entitlementTypes = ['premium_content', 'premium_chat'];
+    
+    // Check if plan includes priority messages
+    if (planFeatures.some((f: string) => 
+      f.toLowerCase().includes('priority') || 
+      f.toLowerCase().includes('message') ||
+      f.toLowerCase().includes('unlimited')
+    )) {
+      entitlementTypes.push('priority_messages');
+    }
+
+    // Create subscription entitlements based on plan
+    const entitlements = entitlementTypes.map(type => ({
+      subscription_id: subscription.id,
+      user_id: user.id,
+      creator_id: creator_id, // Profile/user_id of creator
+      entitlement_type: type,
+      expires_at: expiresAt.toISOString(),
+      is_active: true,
+    }));
 
     const { error: entitlementsError } = await supabaseClient
       .from('subscription_entitlements')
@@ -176,10 +202,22 @@ serve(async (req) => {
       }
     }
 
-    console.log('Subscription processed successfully');
+    console.log('Subscription processed successfully:', {
+      subscriber: user.id,
+      creator: creator_id,
+      plan: plan.name,
+      expires: expiresAt.toISOString(),
+    });
 
     return new Response(
-      JSON.stringify({ success: true, subscription: { expires_at: expiresAt } }),
+      JSON.stringify({ 
+        success: true, 
+        subscription: { 
+          id: subscription.id,
+          expires_at: expiresAt.toISOString(),
+          plan_name: plan.name,
+        } 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

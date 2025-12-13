@@ -225,14 +225,27 @@ export const SubscriptionModalV2 = ({
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser?.email) throw new Error("User email not found");
 
+      // First, look up the actual creator record ID from the creators table
+      const { data: creatorRecord, error: creatorLookupError } = await (supabase as any)
+        .from('creators')
+        .select('id')
+        .eq('user_id', creatorId)
+        .eq('status', 'approved')
+        .maybeSingle();
+
+      if (creatorLookupError || !creatorRecord) {
+        throw new Error('Creator not found or not approved');
+      }
+
+      const actualCreatorId = creatorRecord.id;
       const reference = `SUB-${Date.now()}-${user.id.slice(0, 8)}`;
       
-      // Create payment intent
+      // Create payment intent with the correct creator table ID
       const { error: intentError } = await (supabase as any)
         .from("payment_intents")
         .insert({
           user_id: user.id,
-          creator_id: creatorId,
+          creator_id: actualCreatorId, // Use the actual creator table ID, not the profile ID
           plan_id: selectedPlan.id,
           amount: selectedPlan.price,
           reference: reference,
